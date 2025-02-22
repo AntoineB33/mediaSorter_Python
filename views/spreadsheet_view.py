@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QTableView, QAbstractItemView
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QModelIndex
 from PyQt5.QtWidgets import QHeaderView
 
 class SpreadsheetView(QTableView):
@@ -8,8 +8,8 @@ class SpreadsheetView(QTableView):
     """
     def __init__(self, controller, parent=None):
         super().__init__(parent)
-        self.controller = controller  # Use controller instead of calling the model directly
-        self.setModel(controller.get_model())  # Set the model via the controller
+        self.controller = controller
+        self.setModel(controller.get_model())
         self.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
 
@@ -19,6 +19,10 @@ class SpreadsheetView(QTableView):
         # Connect scroll events
         self.verticalScrollBar().valueChanged.connect(self.handle_vertical_scroll)
         self.horizontalScrollBar().valueChanged.connect(self.handle_horizontal_scroll)
+
+        # Connect model changes to update frozen view visibility
+        self.model().rowsInserted.connect(self.update_frozen_view_geometry)
+        self.model().rowsRemoved.connect(self.update_frozen_view_geometry)
 
     def init_frozen_row(self):
         # Create a frozen row view
@@ -30,6 +34,9 @@ class SpreadsheetView(QTableView):
         self.frozen_row_view.setStyleSheet("QTableView { border: none; }")
         self.frozen_row_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.frozen_row_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
+        # Ensure frozen view always shows the first row
+        self.frozen_row_view.verticalScrollBar().setValue(0)
         
         # Synchronize horizontal scrolling with main view
         self.horizontalScrollBar().valueChanged.connect(
@@ -56,32 +63,23 @@ class SpreadsheetView(QTableView):
         for col in range(self.model().columnCount()):
             self.frozen_row_view.setColumnWidth(col, self.columnWidth(col))
 
-
     def update_frozen_view_geometry(self):
         if self.model().rowCount() == 0:
             self.frozen_row_view.hide()
             return
 
         hheader_height = self.horizontalHeader().height()
-        vheader_width = self.verticalHeader().width()  # Get the width of the row numeration
-        self.frozen_row_view.move(vheader_width, hheader_height)  # Align properly
+        vheader_width = self.verticalHeader().width()
+        self.frozen_row_view.move(vheader_width, hheader_height)
         
         self.frozen_row_view.setFixedWidth(self.viewport().width())
         
-        # Set height to row 0's height
         row0_height = self.rowHeight(0)
         self.frozen_row_view.setFixedHeight(row0_height)
         self.frozen_row_view.show()
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.adjust_row_count(self.verticalScrollBar().value())
-        self.adjust_col_count(self.horizontalScrollBar().value())
-
-        # Ensure frozen row aligns with main table's data area
-        self.sync_frozen_column_widths()
-        self.update_frozen_view_geometry()
-
+        
+        # Ensure frozen view stays at the first row
+        self.frozen_row_view.verticalScrollBar().setValue(0)
 
     def on_row_resized(self, row, old_height, new_height):
         if row == 0:
@@ -89,12 +87,19 @@ class SpreadsheetView(QTableView):
             self.update_frozen_view_geometry()
 
     def update_frozen_column_width(self, logical_index, old_size, new_size):
-        """Ensure that when a column is resized in the main table, it resizes in the frozen row view too."""
         self.frozen_row_view.setColumnWidth(logical_index, new_size)
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.adjust_row_count(self.verticalScrollBar().value())
+        self.adjust_col_count(self.horizontalScrollBar().value())
+        self.sync_frozen_column_widths()
+        self.update_frozen_view_geometry()
 
     def handle_vertical_scroll(self, value):
         self.adjust_row_count(value)
+        # Ensure frozen row stays at the top
+        self.frozen_row_view.verticalScrollBar().setValue(0)
 
     def handle_horizontal_scroll(self, value):
         self.frozen_row_view.horizontalScrollBar().setValue(value)
@@ -113,4 +118,3 @@ class SpreadsheetView(QTableView):
         else:
             lastCol = self.columnAt(self.viewport().width() - 1)
             self.controller.load_less_cols(lastCol)
-    
