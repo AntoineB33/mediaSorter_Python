@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import QTableView, QAbstractItemView
 from PyQt5.QtCore import Qt, QModelIndex, QEvent
 from PyQt5.QtWidgets import QHeaderView
-
 from PyQt5.QtCore import QEvent, Qt, QSize
+from PyQt5.QtCore import QTimer
 
 class SpreadsheetView(QTableView):
     """
@@ -11,8 +11,7 @@ class SpreadsheetView(QTableView):
     def __init__(self, controller, parent=None):
         super().__init__(parent)
         self.controller = controller
-        self.minimized_once = False  # Track first minimize
-        self.default_size = QSize(800, 600)  # Default size after restore
+        self.default_size = QSize(1024, 768)  # Match controller size
         self.setModel(controller.get_model())
         self.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -26,6 +25,26 @@ class SpreadsheetView(QTableView):
         # Update frozen view on model changes
         self.model().rowsInserted.connect(self.update_frozen_view_geometry)
         self.model().rowsRemoved.connect(self.update_frozen_view_geometry)
+        
+        self.scroll_timer = QTimer()
+        self.scroll_timer.setSingleShot(True)
+        self.scroll_timer.timeout.connect(self.adjust_after_scroll)
+        self.last_vertical_value = 0
+        self.last_horizontal_value = 0
+
+    def handle_vertical_scroll(self, value):
+        self.last_vertical_value = value
+        self.scroll_timer.start(200)  # Adjust delay as needed
+
+    def handle_horizontal_scroll(self, value):
+        self.last_horizontal_value = value
+        self.scroll_timer.start(200)
+
+    def adjust_after_scroll(self):
+        self.adjust_row_count(self.last_vertical_value)
+        self.adjust_col_count(self.last_horizontal_value)
+        self.frozen_row_view.verticalScrollBar().setValue(0)
+        self.frozen_row_view.horizontalScrollBar().setValue(self.last_horizontal_value)
 
     def init_frozen_row(self):
         self.frozen_row_view = QTableView(self)
@@ -110,14 +129,6 @@ class SpreadsheetView(QTableView):
         self.adjust_col_count(self.horizontalScrollBar().value())
         self.sync_frozen_column_widths()
         self.update_frozen_view_geometry()
-
-    def handle_vertical_scroll(self, value):
-        self.adjust_row_count(value)
-        self.frozen_row_view.verticalScrollBar().setValue(0)
-
-    def handle_horizontal_scroll(self, value):
-        self.frozen_row_view.horizontalScrollBar().setValue(value)
-        self.adjust_col_count(value)
     
     def adjust_row_count(self, value):
         if value == self.verticalScrollBar().maximum():
