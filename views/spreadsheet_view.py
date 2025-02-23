@@ -2,6 +2,8 @@ from PyQt5.QtWidgets import QTableView, QAbstractItemView
 from PyQt5.QtCore import Qt, QModelIndex, QEvent
 from PyQt5.QtWidgets import QHeaderView
 
+from PyQt5.QtCore import QEvent, Qt, QSize
+
 class SpreadsheetView(QTableView):
     """
     A QTableView with a frozen first row (including vertical header) that is fully editable.
@@ -9,6 +11,8 @@ class SpreadsheetView(QTableView):
     def __init__(self, controller, parent=None):
         super().__init__(parent)
         self.controller = controller
+        self.minimized_once = False  # Track first minimize
+        self.default_size = QSize(800, 600)  # Default size after restore
         self.setModel(controller.get_model())
         self.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.setSelectionMode(QAbstractItemView.SingleSelection)

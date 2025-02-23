@@ -34,7 +34,7 @@ class MainController:
         return self.model
 
     def run(self):
-        self.view.show()
+        self.view.showMaximized()  # Changed from show()
         return self.app.exec_()
 
     def load_more_rows(self):
