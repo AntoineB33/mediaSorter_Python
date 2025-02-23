@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QHeaderView
 
 class SpreadsheetView(QTableView):
     """
-    A QTableView with a frozen first row including the vertical header, editable like the rest.
+    A QTableView with a frozen first row (including vertical header) that is fully editable.
     """
     def __init__(self, controller, parent=None):
         super().__init__(parent)
@@ -32,9 +32,8 @@ class SpreadsheetView(QTableView):
         self.frozen_row_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.frozen_row_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
-        # Show vertical header and sync selection
+        # Show vertical header and use independent selection model
         self.frozen_row_view.verticalHeader().show()
-        self.frozen_row_view.setSelectionModel(self.selectionModel())
         
         # Sync horizontal scroll and column widths
         self.horizontalScrollBar().valueChanged.connect(
@@ -46,19 +45,29 @@ class SpreadsheetView(QTableView):
         self.update_frozen_view_geometry()
         self.verticalHeader().sectionResized.connect(self.on_row_resized)
 
-        # Install event filter to handle mouse events
+        # Install event filter to handle mouse events in frozen view
         self.frozen_row_view.viewport().installEventFilter(self)
+        self.frozen_row_view.verticalHeader().viewport().installEventFilter(self)
 
     def eventFilter(self, source, event):
-        if source == self.frozen_row_view.viewport():
+        if (source == self.frozen_row_view.viewport() or 
+            source == self.frozen_row_view.verticalHeader().viewport()):
             if event.type() in [QEvent.MouseButtonPress, QEvent.MouseButtonDblClick]:
-                # Map position to main view's coordinates
-                pos = self.frozen_row_view.viewport().mapToParent(event.pos())
-                index = self.frozen_row_view.indexAt(pos)
-                # Set selection and edit in main view
-                self.setCurrentIndex(index)
-                self.edit(index)
-                return True
+                # Get index from frozen view's coordinates
+                if source == self.frozen_row_view.verticalHeader().viewport():
+                    # Handle vertical header click (row 0)
+                    row = 0
+                    col = self.columnAt(event.x() + self.verticalHeader().width())  # Adjust for header width
+                    index = self.model().index(row, col)
+                else:
+                    # Handle cell click
+                    index = self.frozen_row_view.indexAt(event.pos())
+                
+                if index.isValid():
+                    # Edit directly in frozen view
+                    self.frozen_row_view.setCurrentIndex(index)
+                    self.frozen_row_view.edit(index)
+                    return True
         return super().eventFilter(source, event)
 
     def sync_frozen_column_widths(self):
@@ -75,11 +84,11 @@ class SpreadsheetView(QTableView):
         viewport_width = self.viewport().width()
         row0_height = self.rowHeight(0)
 
-        # Position frozen view to cover header and first row
+        # Position frozen view to cover vertical header and first row cells
         self.frozen_row_view.move(0, hheader_height)
         self.frozen_row_view.setFixedSize(vheader_width + viewport_width, row0_height)
         
-        # Sync vertical header width and resize rows
+        # Sync vertical header dimensions
         self.frozen_row_view.verticalHeader().setFixedWidth(vheader_width)
         self.frozen_row_view.verticalHeader().setDefaultSectionSize(row0_height)
         self.frozen_row_view.show()
