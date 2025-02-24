@@ -129,13 +129,11 @@ class SpreadsheetView(QTableView):
         self.adjust_col_count(self.horizontalScrollBar().value())
         self.sync_frozen_column_widths()
         self.update_frozen_view_geometry()
-    
-    def adjust_row_count(self, value):
-        self._adjust_row_count(value)
 
-    def _adjust_row_count(self, value):
+    def adjust_row_count(self, value):
         if value == self.verticalScrollBar().maximum():
             self.controller.load_more_rows()
+            QTimer.singleShot(50, lambda: self.adjust_row_count(self.verticalScrollBar().value()))
         else:
             last_row = self.rowAt(self.viewport().height() - 1)
             self.controller.load_less_rows(last_row)
@@ -143,13 +141,7 @@ class SpreadsheetView(QTableView):
     def adjust_col_count(self, value):
         if value == self.horizontalScrollBar().maximum():
             self.controller.load_more_cols()
-        else:
-            last_col = self.columnAt(self.viewport().width() - 1)
-            self.controller.load_less_cols(last_col)
-    
-    def adjust_col_count(self, value):
-        if value == self.horizontalScrollBar().maximum():
-            self.controller.load_more_cols()
+            QTimer.singleShot(50, lambda: self.adjust_col_count(self.horizontalScrollBar().value()))
         else:
             last_col = self.columnAt(self.viewport().width() - 1)
             self.controller.load_less_cols(last_col)
