@@ -31,6 +31,7 @@ class SpreadsheetView(QTableView):
         self.scroll_timer.timeout.connect(self.adjust_after_scroll)
         self.last_vertical_value = 0
         self.last_horizontal_value = 0
+        self.last_viewport_size = None
 
     def handle_vertical_scroll(self, value):
         self.last_vertical_value = value
@@ -123,12 +124,82 @@ class SpreadsheetView(QTableView):
     def update_frozen_column_width(self, logical_index, old_size, new_size):
         self.frozen_row_view.setColumnWidth(logical_index, new_size)
 
+    def delayed_resize_adjustment(self):
+        """Handle resize completion after window animation finishes"""
+        current_size = self.viewport().size()
+        
+        # Compare width AND height
+        if (self.last_viewport_size and 
+            (self.last_viewport_size.width() != current_size.width() or
+            self.last_viewport_size.height() != current_size.height())):
+            self.last_viewport_size = current_size
+            self.adjust_to_viewport()
+            self.sync_frozen_column_widths()
+            self.update_frozen_view_geometry()
+        elif not self.last_viewport_size:  # Initial case
+            self.adjust_to_viewport()
+            self.update_frozen_view_geometry()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.adjust_row_count(self.verticalScrollBar().value())
-        self.adjust_col_count(self.horizontalScrollBar().value())
-        self.sync_frozen_column_widths()
-        self.update_frozen_view_geometry()
+        # Use single-shot timer to ensure this runs after resize completes
+        QTimer.singleShot(50, self.delayed_resize_adjustment)
+
+    def adjust_to_viewport(self):
+        """Ensure enough rows/columns to fill current viewport"""
+        self.adjust_row_count_immediate()
+        self.adjust_col_count_immediate()
+
+    def adjust_row_count_immediate(self):
+        """Force row check without waiting for scroll"""
+        scrollbar = self.verticalScrollBar()
+        max_pos = scrollbar.maximum()
+        current_pos = scrollbar.value()
+        
+        # Check both top and bottom boundaries
+        if current_pos == max_pos:
+            self.controller.load_more_rows()
+        elif current_pos == scrollbar.minimum():
+            self.controller.load_less_rows(0)
+        else:
+            # Calculate how many rows fit in viewport
+            viewport_height = self.viewport().height()
+            if self.model().rowCount() == 0:
+                return
+            row_height = self.rowHeight(0)
+            if row_height == 0: row_height = 25  # Default height
+            visible_rows = viewport_height // row_height
+            if self.model().rowCount() < visible_rows:
+                self.controller.load_more_rows()
+
+    def adjust_col_count_immediate(self):
+        """Force column check without waiting for scroll"""
+        scrollbar = self.horizontalScrollBar()
+        max_pos = scrollbar.maximum()
+        current_pos = scrollbar.value()
+        
+        if current_pos == max_pos:
+            self.controller.load_more_cols()
+        elif current_pos == scrollbar.minimum():
+            self.controller.load_less_cols(0)
+        else:
+            # Calculate how many columns fit in viewport
+            viewport_width = self.viewport().width()
+            first_col_width = self.columnWidth(0) if self.model().columnCount() > 0 else 100  # Default width
+            if first_col_width == 0: first_col_width = 100  # Prevent division by zero
+            visible_cols = viewport_width // first_col_width
+            if self.model().columnCount() < visible_cols:
+                self.controller.load_more_cols()
+
+
+
+    def changeEvent(self, event):
+        """Handle window state changes"""
+        super().changeEvent(event)
+        if event.type() == QEvent.WindowStateChange:
+            # Handle both maximize and restore events
+            self.delayed_resize_adjustment()
+
     
     def adjust_row_count(self, value):
         if value == self.verticalScrollBar().maximum():
