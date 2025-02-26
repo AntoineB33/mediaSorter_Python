@@ -4,15 +4,21 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "cl.exe",
+            "command": "cmd",
             "args": [
-                "/Zi",
-                "/Fe:thread_example.exe",
-                "thread_example.c"
+                "/d",
+                "/c",
+                "call \"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64 && cl.exe /Zi /Fe:c_modules/thread_example.exe c_modules/thread_example.c"
             ],
             "group": {
                 "kind": "build",
                 "isDefault": true
+            },
+            "problemMatcher": [],
+            "options": {
+                "shell": {
+                    "executable": "cmd.exe"
+                }
             }
         }
     ]

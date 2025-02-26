@@ -13,10 +13,10 @@
           "name": "Debug Threads",
           "type": "cppvsdbg",
           "request": "launch",
-          "program": "${workspaceFolder}/thread_example.exe",
+          "program": "${workspaceFolder}/c_modules/thread_example.exe",
           "args": [],
           "stopAtEntry": false,
-          "cwd": "${workspaceFolder}",
+          "cwd": "${workspaceFolder}/c_modules",
           "environment": [],
           "externalConsole": true,
           "preLaunchTask": "build"
