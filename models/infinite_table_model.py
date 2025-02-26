@@ -51,6 +51,7 @@ class InfiniteTableModel(QAbstractTableModel):
 
     def set_column_color(self, col, color):
         """Set the background color of the first cell in the given column."""
+        self._used_row_count = max(self._used_row_count, col + 1)
         self._column_colors[col] = color
         index = self.index(0, col)  # First row, specified column
         self.dataChanged.emit(index, index, [Qt.BackgroundRole])

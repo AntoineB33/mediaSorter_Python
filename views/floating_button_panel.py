@@ -20,8 +20,8 @@ class FloatingButtonPanel(QWidget):
 
     def _init_ui(self):
         # Create buttons (can be extended for additional functionality)
-        self.button1 = QPushButton("Button 1", self)
-        self.button2 = QPushButton("Button 2", self)
+        self.playButton = QPushButton("Play", self)
+        self.sortButton = QPushButton("Sort", self)
 
         # Create a drop-down menu
         self.dropdown = QComboBox(self)
@@ -35,8 +35,8 @@ class FloatingButtonPanel(QWidget):
         padding = 40
         layout.setContentsMargins(padding, padding, padding, padding)
         layout.setSpacing(5)
-        layout.addWidget(self.button1)
-        layout.addWidget(self.button2)
+        layout.addWidget(self.playButton)
+        layout.addWidget(self.sortButton)
         layout.addWidget(self.dropdown)
         self.setLayout(layout)
         self.adjustSize()

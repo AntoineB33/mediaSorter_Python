@@ -8,6 +8,18 @@
         "program": "${workspaceFolder}/app.py",
         "args": ["save1.txt"],
         "console": "integratedTerminal"
+      },
+      {
+          "name": "Debug Threads",
+          "type": "cppvsdbg",
+          "request": "launch",
+          "program": "${workspaceFolder}/thread_example.exe",
+          "args": [],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [],
+          "externalConsole": true,
+          "preLaunchTask": "build"
       }
     ]
   }
