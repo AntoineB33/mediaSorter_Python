@@ -8,13 +8,10 @@
             "args": [
                 "/d",
                 "/c",
-                "call \"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64 && cl.exe /Zi /Fe:c_modules/thread_example.exe c_modules/thread_example.c"
+                "call \"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64 && cl.exe /Zi /fsanitize=address /Fe:c_modules/thread_example.exe c_modules/thread_example.c"
             ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "problemMatcher": [],
+            "group": "build",
+            "problemMatcher": "$msCompile",  // Utilisez le problemMatcher de MSVC
             "options": {
                 "shell": {
                     "executable": "cmd.exe"

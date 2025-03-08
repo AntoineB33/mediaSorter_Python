@@ -10,16 +10,15 @@
         "console": "integratedTerminal"
       },
       {
-          "name": "Debug Threads",
-          "type": "cppvsdbg",
-          "request": "launch",
-          "program": "${workspaceFolder}/c_modules/thread_example.exe",
-          "args": [],
-          "stopAtEntry": false,
-          "cwd": "${workspaceFolder}/c_modules",
-          "environment": [],
-          "externalConsole": true,
-          "preLaunchTask": "build"
+        "name": "Debug Threads",
+        "type": "cppvsdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/c_modules/thread_example.exe",
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}/c_modules",
+        "externalConsole": true,
+        "preLaunchTask": "build",
+        "environment": []
       }
     ]
   }
