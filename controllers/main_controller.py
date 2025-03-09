@@ -101,5 +101,8 @@ class MainController:
     def load_less_cols(self, last_visible_col):
         self.model.load_less_cols(last_visible_col)
 
-    def change_column_color(self, column, color):
-        self.model.set_column_color(column, color)
+    def change_column_color(self, column, role):
+        self.model.set_column_color(column, role)
+
+    def sort_data(self):
+        self.model.sort_data()

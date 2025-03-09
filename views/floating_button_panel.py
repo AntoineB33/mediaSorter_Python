@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout, QComboBox
 from PyQt5.QtCore import Qt, QPoint
 from PyQt5.QtGui import QColor
-from controllers.floating_button_controller import FloatingButtonController  # Import the controller
+from utils.enums import Role
 
 class FloatingButtonPanel(QWidget):
     """
@@ -23,11 +23,13 @@ class FloatingButtonPanel(QWidget):
         self.playButton = QPushButton("Play", self)
         self.sortButton = QPushButton("Sort", self)
 
+        self.sortButton.clicked.connect(self.controller.sort_data)
+
         # Create a drop-down menu
         self.dropdown = QComboBox(self)
-        self.dropdown.addItem("conditions", QColor(Qt.white))
-        self.dropdown.addItem("tags", QColor(Qt.cyan))
-        self.dropdown.addItem("name", QColor(Qt.yellow))
+        self.dropdown.addItem("conditions", Role.CONDITION)
+        self.dropdown.addItem("tags", Role.TAG)
+        self.dropdown.addItem("name", Role.NAME)
         self.dropdown.currentIndexChanged.connect(self.on_color_selected)
 
         # Layout with padding
@@ -53,10 +55,10 @@ class FloatingButtonPanel(QWidget):
 
         current_index = selected_indexes[0]  # Get the first selected cell
         current_column = current_index.column()  # Column of the selected cell
-        selected_color = self.dropdown.currentData()  # Get the selected color
+        selected_role = self.dropdown.currentData()  # Get the selected color
 
         # Notify the Controller instead of modifying the Model directly
-        self.controller.change_column_color(current_column, selected_color)
+        self.controller.change_column_color(current_column, selected_role)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
