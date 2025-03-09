@@ -2,7 +2,6 @@
 
 import sys
 from PyQt5.QtWidgets import QApplication
-from data.table_storage import TableStorage
 from models.infinite_table_model import InfiniteTableModel
 from views.spreadsheet_view import SpreadsheetView
 from views.floating_button_panel import FloatingButtonPanel
@@ -37,8 +36,7 @@ class MainController:
     """
     def __init__(self, collection_filename):
         self.app = QApplication(sys.argv)
-        self.storage = TableStorage(collection_filename)
-        self.model = InfiniteTableModel(self.storage)
+        self.model = InfiniteTableModel(self, collection_filename)
         self.view = SpreadsheetView(self)
         self.view.setModel(self.model)
         self.floating_panel = FloatingButtonPanel(self.view, self)

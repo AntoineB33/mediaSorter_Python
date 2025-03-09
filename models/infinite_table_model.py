@@ -3,27 +3,59 @@ from PyQt5.QtGui import QColor
 from utils.enums import Role
 from ortools.sat.python import cp_model
 from PyQt5.QtCore import QModelIndex, QVariant
+import os
+import json
 
 class InfiniteTableModel(QAbstractTableModel):
     """
     A QAbstractTableModel that dynamically expands and contracts based on user scrolling.
     """
-    def __init__(self, storage, parent=None):
+    def __init__(self, controller, collection_filename, parent=None):
         super().__init__(parent)
-        self._storage = storage
-        self._used_row_count = max((row for row, col in self._storage._data.keys()), default=0) + 1
-        self._used_col_count = max((col for row, col in self._storage._data.keys()), default=0) + 1
+        self.controller = controller
+        self._data = {}
+        self._column_role = {}
+        self.collection_path = collection_filename+".json"
+        self._used_row_count = max((row for row, col in self._data.keys()), default=0) + 1
+        self._used_col_count = max((col for row, col in self._data.keys()), default=0) + 1
         self._row_count = self._used_row_count
         self._col_count = self._used_col_count
         self._hidden_row_at_start = 0  # Number of hidden rows at the start
         self._hidden_col_at_start = 0  # Number of hidden columns at the start
-        self._column_role = {}  # Store column roles
         self._role_colors = {
             Role.UNKNOWN: Qt.white,
             Role.CONDITION: Qt.cyan,
             Role.TAG: Qt.yellow,
             Role.NAME: Qt.green,
         }
+        self.load_data()
+
+    def load_data(self):
+        if os.path.exists(self.collection_path):
+            try:
+                with open(self.collection_path, "r") as f:
+                    loaded_data = json.load(f)
+                
+                # Load the main data
+                self._data = {tuple(map(int, key.split(','))): value for key, value in loaded_data.get("data", {}).items()}
+                
+                # Load the column roles
+                self._column_role = {int(col): Role(role) for col, role in loaded_data.get("column_roles", {}).items()}
+                
+            except Exception as e:
+                print(f"Error loading {self.collection_path}: {e}")
+
+    def save_data(self):
+        # Convert tuple keys to string keys for JSON serialization.
+        serializable_data = {
+            "data": {f"{row},{col}": value for (row, col), value in self._data.items()},
+            "column_roles": {str(col): role.value for col, role in self._column_role.items()}
+        }
+        try:
+            with open(self.collection_path, "w") as f:
+                json.dump(serializable_data, f)
+        except Exception as e:
+            print(f"Error saving {self.collection_path}: {e}")
 
     def rowCount(self, parent=QModelIndex()):
         return self._row_count
@@ -38,7 +70,7 @@ class InfiniteTableModel(QAbstractTableModel):
         row, col = index.row(), index.column()
 
         if role == Qt.DisplayRole or role == Qt.EditRole:
-            return self._storage.get_value(row, col)
+            return self._data.get((row, col), '')
 
         if role == Qt.BackgroundRole and row == 0:  # Apply color only to first row
             return QColor(self._role_colors.get(self._column_role.get(col, Role.UNKNOWN)))
@@ -47,13 +79,13 @@ class InfiniteTableModel(QAbstractTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         if index.isValid() and role == Qt.EditRole:
-            self._storage.set_value(index.row(), index.column(), value)
+            self._data[index.row(), index.column()] = value
             if value:
                 self._used_row_count = max(self._used_row_count, index.row() + 1)
                 self._used_col_count = max(self._used_col_count, index.column() + 1)
             else:
-                self._used_row_count = max((row for row, col in self._storage._data.keys()), default=0) + 1
-                self._used_col_count = max((col for row, col in self._storage._data.keys()), default=0) + 1
+                self._used_row_count = max((row for row, col in self._data.keys()), default=0) + 1
+                self._used_col_count = max((col for row, col in self._data.keys()), default=0) + 1
             self.dataChanged.emit(index, index, [Qt.DisplayRole, Qt.EditRole])
             return True
         return False
@@ -62,6 +94,7 @@ class InfiniteTableModel(QAbstractTableModel):
         """Set the background color of the first cell in the given column."""
         self._used_row_count = max(self._used_row_count, col + 1)
         self._column_role[col] = role
+        self.save_data()
         index = self.index(0, col)  # First row, specified column
         self.dataChanged.emit(index, index, [Qt.BackgroundRole])
     
@@ -107,7 +140,7 @@ class InfiniteTableModel(QAbstractTableModel):
             }
             for col in range(self._used_col_count):
                 role = self._column_role.get(col, Role.UNKNOWN)
-                value = self._storage.get_value(row, col)
+                value = self._data.get((row, col), '')
                 if role == Role.NAME:
                     obj['name'] = value
                 elif role == Role.TAG:
@@ -180,9 +213,9 @@ class InfiniteTableModel(QAbstractTableModel):
             for new_row, old_row in enumerate(sorted_order):
                 for col in range(self._used_col_count):
                     key = (old_row, col)
-                    if key in self._storage._data:
-                        new_data[(new_row, col)] = self._storage._data[key]
-            self._storage._data = new_data
+                    if key in self._data:
+                        new_data[(new_row, col)] = self._data[key]
+            self._data = new_data
             
             # Update used row count and notify view
             self._used_row_count = num_objects
