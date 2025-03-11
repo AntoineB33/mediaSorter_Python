@@ -79,20 +79,24 @@ class InfiniteTableModel(QAbstractTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         if index.isValid() and role == Qt.EditRole:
+            if value != self._data.get((index.row(), index.column()), ''):
+                return False
             self._data[index.row(), index.column()] = value
             if value:
                 self._used_row_count = max(self._used_row_count, index.row() + 1)
                 self._used_col_count = max(self._used_col_count, index.column() + 1)
             else:
-                self._used_row_count = max((row for row, col in self._data.keys()), default=0) + 1
-                self._used_col_count = max((col for row, col in self._data.keys()), default=0) + 1
+                self._used_row_count = max((row for row, _ in self._data.keys()), default=0) + 1
+                self._used_col_count = max((col for _, col in self._data.keys()), default=0) + 1
             self.dataChanged.emit(index, index, [Qt.DisplayRole, Qt.EditRole])
             return True
         return False
 
-    def set_column_color(self, col, role):
+    def change_column_color(self, col, role):
         """Set the background color of the first cell in the given column."""
         self._used_row_count = max(self._used_row_count, col + 1)
+        if role == self._column_role.get(col, Role.UNKNOWN):
+            return
         self._column_role[col] = role
         self.save_data()
         index = self.index(0, col)  # First row, specified column
