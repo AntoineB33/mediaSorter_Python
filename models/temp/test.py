@@ -1,44 +1,42 @@
-from sort import sort_elements
+import random
+from generate_sortings import find_valid_sortings
 
-# Example test case from user
-data = [
-    [["A1", "A2"], ["appears before B"]],
-    [["B"], ["appears after C2", "appears before D"]],
-    [["C1", "C2"], []],
-    [["D", "E"], []],
-]
-
-print("Running test case:")
-num_solutions = sort_elements(data, max_solutions=2)
-print(f"\nFound {num_solutions} solution(s)")
-
-# Validate solution logic
-def validate_solution(solution_order, data):
-    name_to_element = {}
-    for idx, entry in enumerate(data):
-        for name in entry[0]:
-            name_to_element[name] = idx
-
-    pos = {idx: order for order, idx in enumerate(solution_order)}
-    for element_idx, entry in enumerate(data):
-        _, constraints = entry
-        for condition in constraints:
-            parts = condition.split()
-            target_name = parts[2]
-            target_element = name_to_element[target_name]
-            
-            if parts[1] == "before" and pos[element_idx] >= pos[target_element]:
-                return False
-            if parts[1] == "after" and pos[element_idx] <= pos[target_element]:
-                return False
+def validate_table(permutation, table):
+    for i, row in enumerate(table):
+        # Get the index of the current element in the permutation
+        current_index = permutation.index(i)
+        
+        # Check if all elements in the row are before the current element in the permutation
+        for element in row:
+            if element.startswith("after"):
+                j = int(element.split()[1])
+                if permutation.index(j) >= current_index:
+                    return False
     return True
 
-# Manual validation for the example case
-valid_orders = [
-    [2, 0, 1, 3],  # C → A → B → D/E
-    [2, 0, 3, 1],   # C → A → D/E → B
-]
+# Example usage:
+n = random.randint(1, 5)
+permutation = list(range(n))
+random.shuffle(permutation)
 
-print("\nManual validation:")
-for order in valid_orders:
-    print(f"Order {order}: {'Valid' if validate_solution(order, data) else 'Invalid'}")
+table = [[] for _ in range(n)]
+for sorting_index in range(n):
+    predecessors = permutation[:sorting_index]
+    k = random.randint(0, sorting_index)
+    row = random.sample(predecessors, k) if k else []
+    row = ["after " + str(element) for element in row]
+    table[permutation[sorting_index]] = row
+
+print(f"Random n: {n}")
+print(f"Shuffled list: {permutation}\n")
+print("Table of random preceding elements:")
+for i, row in enumerate(table):
+    print(f"Row {i} (Element {i}): {sorted(row)}")
+
+solutions = find_valid_sortings(table, 2)
+
+for i, solution in enumerate(solutions):
+    print(f"\nSolution {i}: {solution}")
+    # Validate the table
+    is_valid = validate_table(solution, table)
+    print(f"\nIs the solution valid? {is_valid}")
