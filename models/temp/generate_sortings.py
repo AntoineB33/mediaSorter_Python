@@ -1,5 +1,5 @@
 from ortools.sat.python import cp_model
-from networkx import DiGraph, topological_sort
+from networkx import DiGraph, topological_sort, NetworkXUnfeasible
 import os
 
 
@@ -76,52 +76,25 @@ class SolutionCollector(cp_model.CpSolverSolutionCallback):
     def get_solutions(self):
         return self.solutions
 
-def find_valid_sortings(table, k):
-    # table = reduce_redundancy(table)
+def find_valid_sortings(table):
     n = len(table)
-    dependencies = []
+    
+    # Check if the graph is a DAG and use topological sort if possible
+    graph = DiGraph()
+    graph.add_nodes_from(range(n))
     for i in range(n):
-        deps = []
-        for s in table[i]:
-            parts = s.strip().split()
-            if len(parts) >= 2 and parts[0].lower() == 'after':
-                try:
-                    j = int(parts[1])
-                    if 0 <= j < n:
-                        deps.append(j)
-                except ValueError:
-                    pass
-        dependencies.append(deps)
-
-    model = cp_model.CpModel()
-    pos = [model.NewIntVar(0, n - 1, f'pos_{i}') for i in range(n)]
-    model.AddAllDifferent(pos)
+        for entry in table[i]:
+            if entry.startswith("after "):
+                j = int(entry.split()[1])
+                graph.add_edge(j, i)
+    solutions = []
+    try:
+        solutions = list(topological_sort(graph))
+    except NetworkXUnfeasible:
+        print("The dependency graph is not a DAG.")
+        return []
 
 
-    workers = 1
-    cpu_available = os.cpu_count()
-    if n > 100:
-        workers = min(cpu_available, 4)
-    if n > 300:
-        workers = min(cpu_available, 5)
-    if n > 500:
-        workers = min(cpu_available, 6)
-    if n > 700:
-        workers = min(cpu_available, 7)
-    if n > 900:
-        workers = min(cpu_available, 8)
-    if n > 1000:
-        workers = min(cpu_available, 16)
-
-    # Corrected constraint: j must come before i
-    for i in range(n):
-        for j in dependencies[i]:
-            model.Add(pos[j] < pos[i])  # Fix: pos[j] < pos[i]
-            
-    solver = cp_model.CpSolver()
-    solver.parameters.num_search_workers = workers
-    solution_collector = SolutionCollector(pos, n, k)
-    solver.parameters.enumerate_all_solutions = True
-    solver.Solve(model, solution_collector)
-
-    return solution_collector.get_solutions()
+    
+    table = reduce_redundancy(table)
+    return solutions

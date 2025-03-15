@@ -4,6 +4,7 @@ from generate_sortings import find_valid_sortings
 NUMBER_OF_TESTS = 10
 TABLE_SIZE_LIMIT = 500
 TABLE_SIZE_MIN = 1
+AFTER_CONSTR_NB_LIMIT = TABLE_SIZE_LIMIT
 
 def validate_table(permutation, table):
     for i, row in enumerate(table):
@@ -33,7 +34,7 @@ for test_num in range(NUMBER_OF_TESTS):
     table = [[] for _ in range(n)]
     for sorting_index in range(n):
         predecessors = permutation[:sorting_index]
-        k = random.randint(0, sorting_index)
+        k = random.randint(0, min(AFTER_CONSTR_NB_LIMIT, sorting_index))
         row = random.sample(predecessors, k) if k else []
         row = ["after " + str(element) for element in row]
         table[permutation[sorting_index]] = row
@@ -44,10 +45,10 @@ for test_num in range(NUMBER_OF_TESTS):
     # for i, row in enumerate(table):
     #     print(f"Row {i} (Element {i}): {sorted(row)}")
 
-    solutions = find_valid_sortings(table, 2)
+    solutions = find_valid_sortings(table)
 
     if not solutions:
-        print_table(table)
+        # print_table(table)
         print("\nNo valid sortings found.")
         break
     for i, solution in enumerate(solutions):
@@ -56,6 +57,6 @@ for test_num in range(NUMBER_OF_TESTS):
         is_valid = validate_table(solution, table)
         print(f"\nIs the solution valid? {is_valid}")
         if not is_valid:
-            print_table(table)
+            # print_table(table)
             break
 print("End of test\n")
