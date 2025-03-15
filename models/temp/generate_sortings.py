@@ -76,25 +76,81 @@ class SolutionCollector(cp_model.CpSolverSolutionCallback):
     def get_solutions(self):
         return self.solutions
 
+
 def find_valid_sortings(table):
     n = len(table)
     
-    # Check if the graph is a DAG and use topological sort if possible
+    # Build dependency graph and parse optimization goals
     graph = DiGraph()
     graph.add_nodes_from(range(n))
+    dependencies = [[] for _ in range(n)]
+    optimization_terms = []
+    
     for i in range(n):
         for entry in table[i]:
             if entry.startswith("after "):
                 j = int(entry.split()[1])
+                dependencies[i].append(j)
                 graph.add_edge(j, i)
-    solutions = []
+            elif entry.startswith("as far as possible from "):
+                x_str = entry.split("from ")[1]
+                X = int(x_str)
+                optimization_terms.append((i, X))
+    
+    # Check if the dependency graph is a DAG
     try:
-        solutions = list(topological_sort(graph))
+        topological_order = list(topological_sort(graph))
     except NetworkXUnfeasible:
         print("The dependency graph is not a DAG.")
         return []
-
-
     
-    table = reduce_redundancy(table)
-    return solutions
+    # If no optimization terms, return the topological order
+    if not optimization_terms:
+        return [topological_order]
+    
+    # Proceed with CP model to optimize the permutation
+    model = cp_model.CpModel()
+    pos = [model.NewIntVar(0, n - 1, f'pos_{i}') for i in range(n)]
+    model.AddAllDifferent(pos)
+    
+    # Add dependency constraints
+    for i in range(n):
+        for j in dependencies[i]:
+            model.Add(pos[j] < pos[i])
+    
+    # Create variables for absolute differences and add to the objective
+    diff_vars = []
+    for i, X in optimization_terms:
+        diff = model.NewIntVar(0, n - 1, f'diff_{i}_{X}')
+        model.AddAbsEquality(diff, pos[i] - pos[X])
+        diff_vars.append(diff)
+    
+    # Maximize the sum of all absolute differences
+    model.Maximize(sum(diff_vars))
+    
+    workers = 1
+    cpu_available = os.cpu_count()
+    if n > 100:
+        workers = min(cpu_available, 4)
+    if n > 300:
+        workers = min(cpu_available, 5)
+    if n > 500:
+        workers = min(cpu_available, 6)
+    if n > 700:
+        workers = min(cpu_available, 7)
+    if n > 900:
+        workers = min(cpu_available, 8)
+    if n > 1000:
+        workers = min(cpu_available, 16)
+            
+    solver = cp_model.CpSolver()
+    solver.parameters.num_search_workers = workers
+    status = solver.Solve(model)
+    
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+        # Extract the solution
+        solution = [solver.Value(pos[i]) for i in range(n)]
+        permutation = sorted(range(n), key=lambda x: solution[x])
+        return [permutation]
+    else:
+        return []
