@@ -79,9 +79,10 @@ class InfiniteTableModel(QAbstractTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         if index.isValid() and role == Qt.EditRole:
-            if value != self._data.get((index.row(), index.column()), ''):
+            if value == self._data.get((index.row(), index.column()), ''):
                 return False
             self._data[index.row(), index.column()] = value
+            self.save_data()
             if value:
                 self._used_row_count = max(self._used_row_count, index.row() + 1)
                 self._used_col_count = max(self._used_col_count, index.column() + 1)

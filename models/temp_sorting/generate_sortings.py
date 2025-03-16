@@ -1,5 +1,5 @@
 from ortools.sat.python import cp_model
-from networkx import DiGraph, topological_sort, NetworkXUnfeasible
+from networkx import DiGraph, topological_sort, NetworkXUnfeasible, simple_cycles
 import os
 
 
@@ -101,7 +101,13 @@ def find_valid_sortings(table):
     try:
         topological_order = list(topological_sort(graph))
     except NetworkXUnfeasible:
-        print("The dependency graph is not a DAG.")
+        # Attempt to find a cycle to report
+        try:
+            cycle = next(simple_cycles(graph))  # Get the first cycle
+            cycle_str = ' -> '.join(map(str, cycle)) + f' -> {cycle[0]}'
+            print(f"The dependency graph contains a cycle: {cycle_str}")
+        except StopIteration:
+            print("The dependency graph is not a DAG (unexpected error).")
         return []
     
     # If no optimization terms, return the topological order

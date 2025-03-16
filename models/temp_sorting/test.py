@@ -68,12 +68,17 @@ def test_DAG():
 
 if __name__ == "__main__":
     table = [
-        ["as far as possible from 1"],
-        [],
-        []
+        ["after 1"],
+        ["after 2"],
+        ["after 0"]
     ]
+    # table = [
+    #     ["as far as possible from 1"],
+    #     [],
+    #     []
+    # ]
 
-    table = [[] for i in range(500)]
-    table[0] = ["as far as possible from 1"]
+    table = [[] for i in range(50)]
+    table[0] = ["after 1", "as far as possible from 1"]
 
     print(find_valid_sortings(table))
