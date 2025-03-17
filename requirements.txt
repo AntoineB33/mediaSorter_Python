@@ -1,5 +1,0 @@
-networkx==3.4.2
-ortools==9.12.4544
-PyQt5==5.15.11
-PyQt5_sip==12.17.0
-PySide6==6.8.2.1
