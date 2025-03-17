@@ -23,8 +23,6 @@ class FloatingButtonPanel(QWidget):
         self.playButton = QPushButton("Play", self)
         self.sortButton = QPushButton("Sort", self)
 
-        self.sortButton.clicked.connect(self.controller.sort_data)
-
         # Create a drop-down menu
         self.dropdown = QComboBox(self)
         self.dropdown.addItem("conditions", Role.CONDITION)

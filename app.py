@@ -1,16 +1,25 @@
-# app.py
-
 import sys
+from PySide6.QtGui import QGuiApplication
+from PySide6.QtQml import QQmlApplicationEngine
+from models.infinite_table_model import InfiniteTableModel
 from controllers.main_controller import MainController
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python app.py <collection_filename>")
-        sys.exit(1)
-    collection_filename = sys.argv[1]
-    controller = MainController(collection_filename)
-    exit_code = controller.run()
-    return exit_code
-
 if __name__ == "__main__":
-    sys.exit(main())
+    app = QGuiApplication(sys.argv)
+    
+    # Initialize components
+    engine = QQmlApplicationEngine()
+    controller = MainController()
+    model = InfiniteTableModel(controller, "collection")
+    
+    # Expose to QML
+    engine.rootContext().setContextProperty("infiniteModel", model)
+    engine.rootContext().setContextProperty("controller", controller)
+    
+    # Load QML
+    engine.load("qml/main.qml")
+    
+    if not engine.rootObjects():
+        sys.exit(-1)
+    
+    sys.exit(app.exec())

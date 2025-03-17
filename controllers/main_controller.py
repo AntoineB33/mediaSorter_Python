@@ -1,106 +1,77 @@
-# controllers/main_controller.py
-
-import sys
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtCore import QObject, Slot, Signal, QThread
 from models.infinite_table_model import InfiniteTableModel
-from views.spreadsheet_view import SpreadsheetView
-from views.floating_button_panel import FloatingButtonPanel
-from PyQt5.QtCore import QThread, pyqtSignal
 
-class LoadRowsThread(QThread):
-    finished = pyqtSignal()
-
-    def __init__(self, model):
-        super().__init__()
-        self.model = model
+class LoadThread(QThread):
+    finished = Signal()
+    
+    def __init__(self, task, parent=None):
+        super().__init__(parent)
+        self.task = task
 
     def run(self):
-        self.model.load_more_rows()
+        self.task()
         self.finished.emit()
 
-class LoadColsThread(QThread):
-    finished = pyqtSignal()
-
-    def __init__(self, model):
-        super().__init__()
-        self.model = model
-
-    def run(self):
-        self.model.load_more_cols()
-        self.finished.emit()
-
-class MainController:
-    """
-    The Controller ties together the model(s) and view(s) and creates
-    a floating button panel that can be dragged around.
-    """
+class MainController(QObject):
+    # Signals for QML communication
+    modelAboutToChange = Signal()
+    modelChanged = Signal()
+    columnColorChanged = Signal(int, str)  # (column, colorName)
+    
     def __init__(self, collection_filename):
-        self.app = QApplication(sys.argv)
-        self.model = InfiniteTableModel(self, collection_filename)
-        self.view = SpreadsheetView(self)
-        self.view.setModel(self.model)
-        self.floating_panel = FloatingButtonPanel(self.view, self)
-        self._position_floating_panel()
+        super().__init__()
+        self._model = InfiniteTableModel(self, collection_filename)
+        self._loading = False
+        
+        # Connect model signals
+        self._model.columnColorChanged.connect(self.handle_column_color_change)
 
-        # Thread management
-        self.loading_rows = False
-        self.loading_cols = False
+    @property
+    def model(self):
+        return self._model
 
+    # QML-exposed methods
+    @Slot()
     def load_more_rows(self):
-        if not self.loading_rows:
-            self.loading_rows = True
-            self.thread = LoadRowsThread(self.model)
-            self.thread.finished.connect(self.on_rows_loaded)
+        if not self._loading:
+            self._loading = True
+            self.thread = LoadThread(self._model.load_more_rows)
+            self.thread.finished.connect(self.on_load_finished)
             self.thread.start()
 
-    def on_rows_loaded(self):
-        self.loading_rows = False
+    @Slot(int)
+    def load_less_rows(self, last_visible_row):
+        self.modelAboutToChange.emit()
+        self._model.load_less_rows(last_visible_row)
+        self.modelChanged.emit()
+
+    @Slot(int, int)
+    def change_column_color(self, column, role_index):
+        roles = [Role.UNKNOWN, Role.CONDITION, Role.TAG, Role.NAME]
+        self._model.change_column_color(column, roles[role_index])
+
+    @Slot()
+    def sort_data(self):
+        self.modelAboutToChange.emit()
+        self._model.sort_data()
+        self.modelChanged.emit()
+
+    @Slot(int, int)
+    def handle_scroll(self, position, maximum):
+        if position >= maximum - 100:  # 100px threshold
+            self.load_more_rows()
+
+    def handle_column_color_change(self, col, color):
+        self.columnColorChanged.emit(col, color.name())
+
+    @Slot()
+    def on_load_finished(self):
+        self._loading = False
+        self.modelChanged.emit()
         self.thread.quit()
         self.thread.wait()
 
-    def load_more_cols(self):
-        if not self.loading_cols:
-            self.loading_cols = True
-            self.thread_col = LoadColsThread(self.model)
-            self.thread_col.finished.connect(self.on_cols_loaded)
-            self.thread_col.start()
-
-    def on_cols_loaded(self):
-        self.loading_cols = False
-        self.thread_col.quit()
-        self.thread_col.wait()
-
-    def _position_floating_panel(self):
-        parent = self.view
-        vertical_sb = parent.verticalScrollBar()
-        vertical_width = vertical_sb.width() if vertical_sb and vertical_sb.isVisible() else 0
-        init_x = parent.width() - vertical_width - self.floating_panel.width()
-        init_y = 0
-        self.floating_panel.move(init_x, init_y)
-        self.floating_panel.show()
-    
-    def get_model(self):
-        return self.model
-
-    def run(self):
-        self.view.resize(1024, 768)  # This sets the normal geometry
-        self.view.showMaximized()  # Changed from show()
-        return self.app.exec_()
-
-    def load_more_rows(self):
-        self.model.load_more_rows()
-    
-    def load_more_cols(self):
-        self.model.load_more_cols()
-
-    def load_less_rows(self, last_visible_row):
-        self.model.load_less_rows(last_visible_row)
-    
-    def load_less_cols(self, last_visible_col):
-        self.model.load_less_cols(last_visible_col)
-
-    def change_column_color(self, column, role):
-        self.model.change_column_color(column, role)
-
-    def sort_data(self):
-        self.model.sort_data()
+    # QML-accessible properties
+    @Property(bool, constant=True)
+    def isLoading(self):
+        return self._loading

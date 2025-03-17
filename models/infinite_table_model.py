@@ -1,15 +1,16 @@
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant
-from PyQt5.QtGui import QColor
+from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, Property, Signal, Slot
+from PySide6.QtGui import QColor
 from utils.enums import Role
 from ortools.sat.python import cp_model
 from PyQt5.QtCore import QModelIndex, QVariant
 import os
 import json
 
+
 class InfiniteTableModel(QAbstractTableModel):
-    """
-    A QAbstractTableModel that dynamically expands and contracts based on user scrolling.
-    """
+    # Add QML-accessible signals
+    columnColorChanged = Signal(int, QColor)
+    
     def __init__(self, controller, collection_filename, parent=None):
         super().__init__(parent)
         self.controller = controller
@@ -29,6 +30,24 @@ class InfiniteTableModel(QAbstractTableModel):
             Role.NAME: Qt.green,
         }
         self.load_data()
+        
+        # Add QML-accessible properties
+        self._role_colors = {
+            Role.UNKNOWN: QColor("white"),
+            Role.CONDITION: QColor("cyan"),
+            Role.TAG: QColor("yellow"),
+            Role.NAME: QColor("green"),
+        }
+
+    # Add QML-accessible properties
+    @Property(QColor, constant=True)
+    def conditionColor(self):
+        return self._role_colors[Role.CONDITION]
+
+    @Property(QColor, constant=True)
+    def tagColor(self):
+        return self._role_colors[Role.TAG]
+
 
     def load_data(self):
         if os.path.exists(self.collection_path):
@@ -132,99 +151,15 @@ class InfiniteTableModel(QAbstractTableModel):
             return Qt.NoItemFlags
         return Qt.ItemIsEditable | Qt.ItemIsSelectable | Qt.ItemIsEnabled
 
-    def sort_data(self):
-        """Sorts the rows based on constraints from Role.CONDITION columns, tags from Role.TAG, and names from Role.NAME."""
-        # Collect all objects (rows) with their attributes
-        objects = []
-        for row in range(self._used_row_count):
-            obj = {
-                'name': '',
-                'tags': [],
-                'conditions': [],
-                'original_row': row
-            }
-            for col in range(self._used_col_count):
-                role = self._column_role.get(col, Role.UNKNOWN)
-                value = self._data.get((row, col), '')
-                if role == Role.NAME:
-                    obj['name'] = value
-                elif role == Role.TAG:
-                    if value:  # Assume tags are stored as strings (split if multiple)
-                        obj['tags'].extend(value.split(','))
-                elif role == Role.CONDITION:
-                    if value:
-                        obj['conditions'].append(value)
-            objects.append(obj)
-        
-        # Parse conditions into hard constraints and optimization goals
-        # Example: Extract "A before B" constraints and "maximize distance D" goals
-        constraints = []
-        a_tag_objects = []  # Objects with tag "A"
-        b_tag_objects = []  # Objects with tag "B"
-        d_tag_objects = []  # Objects with tag "D"
-        for obj in objects:
-            for condition in obj['conditions']:
-                # Simple parser for demonstration (customize based on your condition format)
-                if "before" in condition:
-                    parts = condition.split()
-                    tag = parts[0]
-                    other_tag = parts[2]
-                    if tag == 'A':
-                        a_tag_objects.append(obj)
-                    elif other_tag == 'B':
-                        b_tag_objects.append(obj)
-                elif "maximize distance" in condition:
-                    target_tag = condition.split()[-1]
-                    if target_tag == 'D':
-                        d_tag_objects = [obj for obj in objects if target_tag in obj['tags']]
-        
-        # Set up CP-SAT model
-        model = cp_model.CpModel()
-        num_objects = len(objects)
-        positions = {obj['original_row']: model.NewIntVar(0, num_objects - 1, f'pos_{obj["original_row"]}') for obj in objects}
-        model.AddAllDifferent(list(positions.values()))  # All positions must be unique
-        
-        # Hard constraint: All "A" tagged objects before "B" tagged
-        for a_obj in a_tag_objects:
-            for b_obj in b_tag_objects:
-                model.Add(positions[a_obj['original_row']] < positions[b_obj['original_row']])
-        
-        # Soft constraint: Maximize minimum distance between "D" tagged objects
-        if d_tag_objects:
-            d_pairs = [(d1, d2) for i, d1 in enumerate(d_tag_objects) for d2 in d_tag_objects[i+1:]]
-            dist_vars = []
-            for d1, d2 in d_pairs:
-                diff = model.NewIntVar(-num_objects, num_objects, '')
-                model.Add(diff == positions[d1['original_row']] - positions[d2['original_row']])
-                dist_var = model.NewIntVar(0, num_objects, '')
-                model.AddAbsEquality(dist_var, diff)
-                dist_vars.append(dist_var)
-            if dist_vars:
-                min_distance = model.NewIntVar(0, num_objects, 'min_distance')
-                model.AddMinEquality(min_distance, dist_vars)
-                model.Maximize(min_distance)
-        
-        # Solve the model
-        solver = cp_model.CpSolver()
-        status = solver.Solve(model)
-        
-        if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-            # Extract sorted order
-            sorted_objects = sorted(objects, key=lambda x: solver.Value(positions[x['original_row']]))
-            sorted_order = [obj['original_row'] for obj in sorted_objects]
-            
-            # Reorder the storage's data
-            new_data = {}
-            for new_row, old_row in enumerate(sorted_order):
-                for col in range(self._used_col_count):
-                    key = (old_row, col)
-                    if key in self._data:
-                        new_data[(new_row, col)] = self._data[key]
-            self._data = new_data
-            
-            # Update used row count and notify view
-            self._used_row_count = num_objects
-            self.beginResetModel()
-            self.endResetModel()
-        else:
-            print("Sorting failed: No valid order found.")
+    def roleNames(self):
+        # Expose custom roles to QML
+        roles = super().roleNames()
+        roles[Qt.DisplayRole] = b"display"
+        roles[Qt.BackgroundRole] = b"background"
+        return roles
+
+    def change_column_color(self, col, role):
+        """QML-callable version"""
+        self._column_role[col] = role
+        self.save_data()
+        self.columnColorChanged.emit(col, self._role_colors[role])
