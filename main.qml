@@ -1,4 +1,3 @@
-// main.qml (updated view component)
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -7,7 +6,7 @@ Window {
     width: 800
     height: 600
     visible: true
-    title: "Smooth Scroll Spreadsheet"
+    title: "Dynamic Spreadsheet"
 
     TableView {
         id: tableView
@@ -17,46 +16,45 @@ Window {
 
         property real cellWidth: 100
         property real cellHeight: 30
-        property real minExtraSpace: 20  // Minimum extra space to ensure scrollability
 
+        // Disable bouncing effect
+        boundsBehavior: Flickable.StopAtBounds
+
+        // Initialize with enough rows/columns to make scrollbars appear
         Component.onCompleted: {
-            // Initial rows/columns with buffer space for scrolling
-            const initRows = Math.ceil(height / cellHeight) + 1
-            const initCols = Math.ceil(width / cellWidth) + 1
+            const initRows = Math.ceil(height / cellHeight) + 2
+            const initCols = Math.ceil(width / cellWidth) + 2
             spreadsheetModel.addRows(initRows)
             spreadsheetModel.addColumns(initCols)
         }
 
+        // Vertical scrollbar
         ScrollBar.vertical: ScrollBar {
+            id: verticalScrollbar
             policy: ScrollBar.AlwaysOn
+
             onPositionChanged: {
-                // Calculate remaining space below visible area
-                const contentBottom = tableView.contentY + tableView.height
-                const totalHeight = spreadsheetModel.rowCount * tableView.cellHeight
-                const remainingSpace = totalHeight - contentBottom
-                
-                // Add row when within 1 cell height of bottom
-                if (remainingSpace <= tableView.cellHeight) {
+                // Check if the scrollbar is at the bottom
+                if (position >= 1.0 - size) {
                     spreadsheetModel.addRows(1)
                 }
             }
         }
 
+        // Horizontal scrollbar
         ScrollBar.horizontal: ScrollBar {
+            id: horizontalScrollbar
             policy: ScrollBar.AlwaysOn
+
             onPositionChanged: {
-                // Calculate remaining space to the right
-                const contentRight = tableView.contentX + tableView.width
-                const totalWidth = spreadsheetModel.columnCount * tableView.cellWidth
-                const remainingSpace = totalWidth - contentRight
-                
-                // Add column when within 1 cell width of right
-                if (remainingSpace <= tableView.cellWidth) {
+                // Check if the scrollbar is at the right
+                if (position >= 1.0 - size) {
                     spreadsheetModel.addColumns(1)
                 }
             }
         }
 
+        // Cell delegate
         delegate: Rectangle {
             implicitWidth: tableView.cellWidth
             implicitHeight: tableView.cellHeight
