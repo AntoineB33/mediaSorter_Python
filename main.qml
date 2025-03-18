@@ -31,9 +31,17 @@ Window {
             policy: ScrollBar.AlwaysOn
 
             onPositionChanged: {
-                // Check if the scrollbar is at the bottom
                 if (position >= 1.0 - size) {
                     spreadsheetModel.addRows(1)
+                } else {
+                    var L = spreadsheetModel.getMaxRow() + 1
+                    var n = Math.floor((tableView.contentY + tableView.height) / tableView.cellHeight + 1)
+                    var requiredRows = Math.max(L, n)
+                    var currentRows = spreadsheetModel.rowCount()
+                    console.log("requiredRows : "+requiredRows+" currentRows : "+currentRows)
+                    if (requiredRows != currentRows) {
+                        spreadsheetModel.setRows(requiredRows)
+                    }
                 }
             }
         }
@@ -44,9 +52,16 @@ Window {
             policy: ScrollBar.AlwaysOn
 
             onPositionChanged: {
-                // Check if the scrollbar is at the right
                 if (position >= 1.0 - size) {
                     spreadsheetModel.addColumns(1)
+                } else {
+                    var L = spreadsheetModel.getMaxColumn() + 1
+                    var n = Math.floor((tableView.contentX + tableView.width) / tableView.cellWidth + 1)
+                    var requiredCols = Math.max(L, n)
+                    var currentCols = spreadsheetModel.columnCount()
+                    if (requiredCols != currentCols) {
+                        spreadsheetModel.setColumns(requiredCols)
+                    }
                 }
             }
         }
