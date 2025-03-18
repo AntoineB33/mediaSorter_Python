@@ -17,9 +17,6 @@ Window {
         property real cellWidth: 100
         property real cellHeight: 30
 
-        // Disable bouncing effect
-        boundsBehavior: Flickable.StopAtBounds
-
         // Initialize with enough rows/columns to make scrollbars appear
         Component.onCompleted: {
             const initRows = Math.ceil(height / cellHeight) + 2
