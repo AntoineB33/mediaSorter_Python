@@ -29,17 +29,20 @@ Window {
         MouseArea {
             anchors.fill: parent
             propagateComposedEvents: true
-            onPressed: mouse.accepted = false // Allow click events to pass through
+            
             onWheel: function(wheel) {
                 if (wheel.modifiers & Qt.ShiftModifier) {
-                    // Calculate horizontal scroll based on wheel delta
-                    var deltaSteps = wheel.angleDelta.y / 120; // Steps (up/down)
-                    var deltaX = -deltaSteps * tableView.cellWidth;
-                    var newX = tableView.contentItem.contentX + deltaX;
+                    // Calculate horizontal scroll amount
+                    const delta = wheel.angleDelta.y + wheel.angleDelta.x;
+                    const step = delta / 120; // Normalize wheel steps
                     
-                    // Clamp to valid range
-                    newX = Math.max(0, Math.min(newX, tableView.contentItem.contentWidth - tableView.contentItem.width));
-                    tableView.contentItem.contentX = newX;
+                    // Update horizontal scrollbar position
+                    horizontalScrollbar.position = Math.max(0,
+                        Math.min(1 - horizontalScrollbar.size, 
+                        horizontalScrollbar.position - step * 0.1));
+                    
+                    // Trigger position change handler
+                    horizontalScrollbar.positionChanged();
                     wheel.accepted = true;
                 } else {
                     wheel.accepted = false; // Allow vertical scrolling
