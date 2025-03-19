@@ -25,6 +25,28 @@ Window {
             spreadsheetModel.addColumns(initCols)
         }
 
+        // Handle Shift + Wheel for horizontal scrolling
+        MouseArea {
+            anchors.fill: parent
+            propagateComposedEvents: true
+            onPressed: mouse.accepted = false // Allow click events to pass through
+            onWheel: function(wheel) {
+                if (wheel.modifiers & Qt.ShiftModifier) {
+                    // Calculate horizontal scroll based on wheel delta
+                    var deltaSteps = wheel.angleDelta.y / 120; // Steps (up/down)
+                    var deltaX = -deltaSteps * tableView.cellWidth;
+                    var newX = tableView.contentItem.contentX + deltaX;
+                    
+                    // Clamp to valid range
+                    newX = Math.max(0, Math.min(newX, tableView.contentItem.contentWidth - tableView.contentItem.width));
+                    tableView.contentItem.contentX = newX;
+                    wheel.accepted = true;
+                } else {
+                    wheel.accepted = false; // Allow vertical scrolling
+                }
+            }
+        }
+
         // Vertical scrollbar
         ScrollBar.vertical: ScrollBar {
             id: verticalScrollbar
@@ -34,11 +56,10 @@ Window {
                 if (position >= 1.0 - size) {
                     spreadsheetModel.addRows(1)
                 } else {
-                    var L = spreadsheetModel.getMaxRow() + 1
+                    var L = spreadsheetModel.getMaxRow()
                     var n = Math.floor((tableView.contentY + tableView.height) / tableView.cellHeight + 1)
                     var requiredRows = Math.max(L, n)
                     var currentRows = spreadsheetModel.rowCount()
-                    console.log("requiredRows : "+requiredRows+" currentRows : "+currentRows)
                     if (requiredRows != currentRows) {
                         spreadsheetModel.setRows(requiredRows)
                     }
@@ -55,7 +76,7 @@ Window {
                 if (position >= 1.0 - size) {
                     spreadsheetModel.addColumns(1)
                 } else {
-                    var L = spreadsheetModel.getMaxColumn() + 1
+                    var L = spreadsheetModel.getMaxColumn()
                     var n = Math.floor((tableView.contentX + tableView.width) / tableView.cellWidth + 1)
                     var requiredCols = Math.max(L, n)
                     var currentCols = spreadsheetModel.columnCount()
