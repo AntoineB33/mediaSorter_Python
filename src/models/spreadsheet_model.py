@@ -10,8 +10,8 @@ class SpreadsheetModel(QAbstractTableModel):
         self._rows = 0
         self._columns = 0
         self._data = []
-        self._max_row = -1  # Track the highest edited row index
-        self._max_col = -1  # Track the highest edited column index
+        self._used_row_nb = -1  # Track the highest edited row index
+        self._used_col_nb = -1  # Track the highest edited column index
         self.load_from_file()
 
     def rowCount(self, parent=None):
@@ -30,12 +30,13 @@ class SpreadsheetModel(QAbstractTableModel):
             row = index.row()
             col = index.column()
             self._data[row][col] = value
-            if row > self._max_row:
-                self._max_row = row
-            if col > self._max_col:
-                self._max_col = col
+            if row > self._used_row_nb:
+                self._used_row_nb = row
+            if col > self._used_col_nb:
+                self._used_col_nb = col
             # Emit dataChanged for both EditRole and DisplayRole
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
+            self.save_to_file()
             return True
         return False
 
@@ -96,11 +97,11 @@ class SpreadsheetModel(QAbstractTableModel):
 
     @Slot(result=int)
     def getMaxRow(self):
-        return self._max_row
+        return self._used_row_nb
 
     @Slot(result=int)
     def getMaxColumn(self):
-        return self._max_col
+        return self._used_col_nb
 
     def roleNames(self):
         return {Qt.DisplayRole: b"display"}
@@ -108,10 +109,8 @@ class SpreadsheetModel(QAbstractTableModel):
     def save_to_file(self, filename="spreadsheet.json"):
         """Save model data to a JSON file"""
         data = {
-            "rows": self._rows,
-            "columns": self._columns,
-            "max_row": self._max_row,
-            "max_col": self._max_col,
+            "max_row": self._used_row_nb,
+            "max_col": self._used_col_nb,
             "data": self._data
         }
         with open(filename, 'w') as f:
@@ -124,10 +123,8 @@ class SpreadsheetModel(QAbstractTableModel):
                 data = json.load(f)
             
             self.beginResetModel()
-            self._rows = data["rows"]
-            self._columns = data["columns"]
-            self._max_row = data["max_row"]
-            self._max_col = data["max_col"]
+            self._used_row_nb = data["max_row"]
+            self._used_col_nb = data["max_col"]
             self._data = data["data"]
             self.endResetModel()
         except FileNotFoundError:
@@ -135,23 +132,3 @@ class SpreadsheetModel(QAbstractTableModel):
             pass
         except Exception as e:
             print(f"Error loading spreadsheet: {str(e)}")
-
-def main():
-    app = QGuiApplication(sys.argv)
-    engine = QQmlApplicationEngine()
-    
-    model = SpreadsheetModel()
-    engine.rootContext().setContextProperty("spreadsheetModel", model)
-    
-    # Save data when app quits
-    app.aboutToQuit.connect(model.save_to_file)
-    
-    engine.load(QUrl.fromLocalFile("main.qml"))
-    
-    if not engine.rootObjects():
-        sys.exit(-1)
-    
-    sys.exit(app.exec())
-
-if __name__ == "__main__":
-    main()

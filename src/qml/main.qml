@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "./components" as Components
 
 Window {
     width: 800
@@ -21,8 +22,8 @@ Window {
         Component.onCompleted: {
             const initRows = Math.max(spreadsheetModel.rowCount(), Math.ceil(height / cellHeight + 1))
             const initCols = Math.max(spreadsheetModel.columnCount(), Math.ceil(width / cellWidth + 1))
-            spreadsheetModel.addRows(initRows)
-            spreadsheetModel.addColumns(initCols)
+            spreadsheetModel.setRows(initRows)
+            spreadsheetModel.setColumns(initCols)
             console.log("Initialized with rows: " + initRows + ", columns: " + initCols)
         }
 
@@ -93,26 +94,6 @@ Window {
         }
 
         // Cell delegate
-        delegate: Rectangle {
-            implicitWidth: tableView.cellWidth
-            implicitHeight: tableView.cellHeight
-            border.color: "lightgray"
-
-            TextInput {
-                anchors.fill: parent
-                anchors.margins: 2
-                text: model.display
-                onEditingFinished: {
-                    console.log("Editing finished. New text: " + text)
-                    // Ensure the model is updated
-                    var modelIndex = tableView.model.index(model.row, model.column)
-                    // Pass value and EditRole as arguments
-                    var success = spreadsheetModel.setData(modelIndex, text, Qt.EditRole)
-                    if (!success) {
-                        console.error("Failed to update model data at index: " + model.index)
-                    }
-                }
-            }
-        }
+        delegate: Components.CellDelegate {}
     }
 }
