@@ -19,10 +19,11 @@ Window {
 
         // Initialize with enough rows/columns to make scrollbars appear
         Component.onCompleted: {
-            const initRows = Math.ceil(height / cellHeight) + 2
-            const initCols = Math.ceil(width / cellWidth) + 2
+            const initRows = Math.max(spreadsheetModel.rowCount(), Math.ceil(height / cellHeight + 1))
+            const initCols = Math.max(spreadsheetModel.columnCount(), Math.ceil(width / cellWidth + 1))
             spreadsheetModel.addRows(initRows)
             spreadsheetModel.addColumns(initCols)
+            console.log("Initialized with rows: " + initRows + ", columns: " + initCols)
         }
 
         // Handle Shift + Wheel for horizontal scrolling
@@ -84,6 +85,7 @@ Window {
                     var requiredCols = Math.max(L, n)
                     var currentCols = spreadsheetModel.columnCount()
                     if (requiredCols != currentCols) {
+                        console.log("requiredCols : "+requiredCols+" currentCols : "+currentCols)
                         spreadsheetModel.setColumns(requiredCols)
                     }
                 }
@@ -100,7 +102,16 @@ Window {
                 anchors.fill: parent
                 anchors.margins: 2
                 text: model.display
-                onEditingFinished: model.display = text
+                onEditingFinished: {
+                    console.log("Editing finished. New text: " + text)
+                    // Ensure the model is updated
+                    var modelIndex = tableView.model.index(model.row, model.column)
+                    // Pass value and EditRole as arguments
+                    var success = spreadsheetModel.setData(modelIndex, text, Qt.EditRole)
+                    if (!success) {
+                        console.error("Failed to update model data at index: " + model.index)
+                    }
+                }
             }
         }
     }

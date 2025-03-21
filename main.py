@@ -1,4 +1,5 @@
 import sys
+import json
 from PySide6.QtCore import QAbstractTableModel, Qt, QUrl, QModelIndex, Slot, Property
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
@@ -11,6 +12,7 @@ class SpreadsheetModel(QAbstractTableModel):
         self._data = []
         self._max_row = -1  # Track the highest edited row index
         self._max_col = -1  # Track the highest edited column index
+        self.load_from_file()
 
     def rowCount(self, parent=None):
         return self._rows
@@ -32,7 +34,8 @@ class SpreadsheetModel(QAbstractTableModel):
                 self._max_row = row
             if col > self._max_col:
                 self._max_col = col
-            self.dataChanged.emit(index, index, [role])
+            # Emit dataChanged for both EditRole and DisplayRole
+            self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
             return True
         return False
 
@@ -101,6 +104,37 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def roleNames(self):
         return {Qt.DisplayRole: b"display"}
+    
+    def save_to_file(self, filename="spreadsheet.json"):
+        """Save model data to a JSON file"""
+        data = {
+            "rows": self._rows,
+            "columns": self._columns,
+            "max_row": self._max_row,
+            "max_col": self._max_col,
+            "data": self._data
+        }
+        with open(filename, 'w') as f:
+            json.dump(data, f)
+
+    def load_from_file(self, filename="spreadsheet.json"):
+        """Load model data from a JSON file"""
+        try:
+            with open(filename, 'r') as f:
+                data = json.load(f)
+            
+            self.beginResetModel()
+            self._rows = data["rows"]
+            self._columns = data["columns"]
+            self._max_row = data["max_row"]
+            self._max_col = data["max_col"]
+            self._data = data["data"]
+            self.endResetModel()
+        except FileNotFoundError:
+            # No saved data, initialize with defaults if needed
+            pass
+        except Exception as e:
+            print(f"Error loading spreadsheet: {str(e)}")
 
 def main():
     app = QGuiApplication(sys.argv)
@@ -108,6 +142,9 @@ def main():
     
     model = SpreadsheetModel()
     engine.rootContext().setContextProperty("spreadsheetModel", model)
+    
+    # Save data when app quits
+    app.aboutToQuit.connect(model.save_to_file)
     
     engine.load(QUrl.fromLocalFile("main.qml"))
     
