@@ -91,7 +91,7 @@ class SpreadsheetModel(QAbstractTableModel):
     def setColumns(self, count):
         if count < 0 or self.c:
             return
-        self.c = True
+        # self.c = True
         if count < self._columns_nb:
             self.beginRemoveColumns(QModelIndex(), count, self._columns_nb - 1)
             for row in self._data:

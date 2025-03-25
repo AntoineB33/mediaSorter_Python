@@ -63,8 +63,8 @@ Window {
 
             // Initialize with enough rows/columns to make scrollbars appear
             Component.onCompleted: {
-                const initRows = Math.max(spreadsheetModel.get_used_rows_nb(), Math.ceil(height / cellHeight + 1))
-                const initCols = Math.max(spreadsheetModel.get_used_cols_nb(), Math.ceil(width / cellWidth + 1))
+                const initRows = Math.max(spreadsheetModel.get_used_rows_nb(), Math.floor(height / cellHeight + 1))
+                const initCols = Math.max(spreadsheetModel.get_used_cols_nb(), Math.floor(width / cellWidth + 1))
                 spreadsheetModel.setRows(initRows)
                 spreadsheetModel.setColumns(initCols)
                 console.log("Initialized with rows: " + initRows + ", columns: " + initCols)
