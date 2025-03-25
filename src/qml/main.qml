@@ -67,7 +67,6 @@ Window {
                 const initCols = Math.max(spreadsheetModel.get_used_cols_nb(), Math.floor(width / cellWidth + 1))
                 spreadsheetModel.setRows(initRows)
                 spreadsheetModel.setColumns(initCols)
-                console.log("Initialized with rows: " + initRows + ", columns: " + initCols)
             }
 
             // Handle Shift + Wheel for horizontal scrolling
@@ -116,23 +115,14 @@ Window {
                 policy: ScrollBar.AlwaysOn
 
                 onPositionChanged: {
-                    console.log("onPositionChanged")
                     if (position >= 1.0 - size) {
                         spreadsheetModel.addColumns(1)
                     } else {
                         var L = spreadsheetModel.getMaxColumn()
                         var n = Math.floor((tableView.contentX + tableView.width) / tableView.cellWidth + 1)
-                        console.log("spreadsheetModel.getMaxColumn() : "+spreadsheetModel.getMaxColumn())
-                        console.log("tableView.contentX : "+tableView.contentX)
-                        console.log("tableView.width : "+tableView.width)
-                        console.log("tableView.cellWidth : "+tableView.cellWidth)
-                        console.log("position : "+position)
-                        console.log("size : "+size)
-                        console.log("L : "+L+" n : "+n)
                         var requiredCols = Math.max(L + 1, n)
                         var currentCols = spreadsheetModel.columnCount()
                         if (requiredCols != currentCols) {
-                            console.log("requiredCols : "+requiredCols+" currentCols : "+currentCols)
                             spreadsheetModel.setColumns(requiredCols)
                         }
                     }
