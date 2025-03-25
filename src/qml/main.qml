@@ -77,20 +77,15 @@ Window {
                 
                 onWheel: function(wheel) {
                     if (wheel.modifiers & Qt.ShiftModifier) {
-                        // Calculate horizontal scroll amount
-                        const delta = wheel.angleDelta.y + wheel.angleDelta.x;
-                        const step = delta / 120; // Normalize wheel steps
+                        // Use vertical wheel movement for horizontal scrolling when Shift is pressed
+                        const delta = wheel.angleDelta.y;
+                        // Normalize and scale the scroll amount
+                        const step = delta / Math.abs(delta) * 0.1; // 0.1 is the scroll speed factor
                         
-                        // Update horizontal scrollbar position
+                        // Calculate new position with bounds checking
                         horizontalScrollbar.position = Math.max(0,
-                            Math.min(1 - horizontalScrollbar.size, 
-                            horizontalScrollbar.position - step * 0.1));
-                        
-                        // Trigger position change handler
-                        horizontalScrollbar.positionChanged();
-                        wheel.accepted = true;
-                    } else {
-                        wheel.accepted = false; // Allow vertical scrolling
+                            Math.min(1 - horizontalScrollbar.size,
+                            horizontalScrollbar.position - step));
                     }
                 }
             }
@@ -121,11 +116,19 @@ Window {
                 policy: ScrollBar.AlwaysOn
 
                 onPositionChanged: {
+                    console.log("onPositionChanged")
                     if (position >= 1.0 - size) {
                         spreadsheetModel.addColumns(1)
                     } else {
                         var L = spreadsheetModel.getMaxColumn()
                         var n = Math.floor((tableView.contentX + tableView.width) / tableView.cellWidth + 1)
+                        console.log("spreadsheetModel.getMaxColumn() : "+spreadsheetModel.getMaxColumn())
+                        console.log("tableView.contentX : "+tableView.contentX)
+                        console.log("tableView.width : "+tableView.width)
+                        console.log("tableView.cellWidth : "+tableView.cellWidth)
+                        console.log("position : "+position)
+                        console.log("size : "+size)
+                        console.log("L : "+L+" n : "+n)
                         var requiredCols = Math.max(L + 1, n)
                         var currentCols = spreadsheetModel.columnCount()
                         if (requiredCols != currentCols) {

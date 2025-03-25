@@ -7,6 +7,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 class SpreadsheetModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.c = False
         self._data = []
         self._rows_nb = 0
         self._columns_nb = 0
@@ -88,8 +89,9 @@ class SpreadsheetModel(QAbstractTableModel):
     
     @Slot(int)
     def setColumns(self, count):
-        if count < 0:
+        if count < 0 or self.c:
             return
+        self.c = True
         if count < self._columns_nb:
             self.beginRemoveColumns(QModelIndex(), count, self._columns_nb - 1)
             for row in self._data:
