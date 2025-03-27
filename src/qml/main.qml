@@ -85,6 +85,9 @@ Window {
                         horizontalScrollbar.position = Math.max(0,
                             Math.min(1 - horizontalScrollbar.size,
                             horizontalScrollbar.position - step));
+                    } else {
+                        // Let the TableView handle the wheel event
+                        wheel.accepted = false;
                     }
                 }
             }
