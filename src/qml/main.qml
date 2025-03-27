@@ -13,10 +13,11 @@ Window {
         anchors.fill: parent
         spacing: 0
 
-        // Vertical Header (Row Numbers)
+
         ListView {
             id: rowHeader
             Layout.preferredWidth: 40
+            Layout.fillHeight: true  // Add this line
             model: spreadsheetModel.rowCount()
             boundsBehavior: Flickable.StopAtBounds
             interactive: false
@@ -29,23 +30,21 @@ Window {
                 border.color: "#cccccc"
                 
                 Text {
-                    text: index + 1  // Show 1-based index
+                    text: index + 1
                     anchors.centerIn: parent
                     font.pixelSize: 12
                 }
             }
 
-            // Synchronize vertical scrolling with TableView
             contentY: tableView.contentY
 
-            // Update model when rows are added/removed
             Connections {
                 target: spreadsheetModel
                 function onRowsInserted(parent, first, last) { 
-                    rowHeader.model = spreadsheetModel.rowCount() 
+                    rowHeader.model = spreadsheetModel.rowCount(); 
                 }
                 function onRowsRemoved(parent, first, last) { 
-                    rowHeader.model = spreadsheetModel.rowCount() 
+                    rowHeader.model = spreadsheetModel.rowCount(); 
                 }
             }
         }
@@ -85,6 +84,9 @@ Window {
                         horizontalScrollbar.position = Math.max(0,
                             Math.min(1 - horizontalScrollbar.size,
                             horizontalScrollbar.position - step));
+                        wheel.accepted = true;
+                    } else {
+                        wheel.accepted = false; // Allow vertical scrolling
                     }
                 }
             }
@@ -116,6 +118,7 @@ Window {
 
                 onPositionChanged: {
                     if (position >= 1.0 - size) {
+                        // Add a new column when the scrollbar reaches the end
                         spreadsheetModel.addColumns(1)
                     } else {
                         var L = spreadsheetModel.getMaxColumn()
@@ -123,6 +126,7 @@ Window {
                         var requiredCols = Math.max(L + 1, n)
                         var currentCols = spreadsheetModel.columnCount()
                         if (requiredCols != currentCols) {
+                            console.log("Setting columns to " + requiredCols)
                             spreadsheetModel.setColumns(requiredCols)
                         }
                     }

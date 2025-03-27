@@ -3,7 +3,23 @@
 *.json
 *.xlsx
 
+# Logs
+*.log
+
 # Auto-generated files
 *.pyc
 __pycache__/
 .qmlc
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# IDE-specific files
+.idea/
+.vscode/
+*.iml
+
+# Virtual environments
+venv/
+.env/
