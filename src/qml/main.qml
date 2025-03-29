@@ -165,13 +165,25 @@ Window {
                 spacing: 5
                 TextInput {
                     id: spreadsheetNameInput
-                    placeholderText: "Enter spreadsheet name"
+                    // Remove placeholderText and use a workaround
                     text: spreadsheetModel.currentSpreadsheetName || "Default"
                     onEditingFinished: {
                         if (text.trim() === "") {
                             text = spreadsheetModel.getDefaultSpreadsheetName();
                         }
                         spreadsheetModel.setSpreadsheetName(text);
+                    }
+
+                    // Placeholder workaround
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "transparent"
+                        visible: spreadsheetNameInput.text === ""
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Enter spreadsheet name"
+                            color: "gray"
+                        }
                     }
                 }
                 Button {
