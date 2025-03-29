@@ -1,5 +1,6 @@
 import sys
 import json
+from pathlib import Path
 from PySide6.QtCore import QAbstractTableModel, Qt, QUrl, QModelIndex, Slot, Property
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
@@ -13,7 +14,38 @@ class SpreadsheetModel(QAbstractTableModel):
         self._columns_nb = 0
         self._used_rows_nb = -1  # Track the highest edited row index
         self._used_cols_nb = -1  # Track the highest edited column index
+        self.current_spreadsheet_name = "Default"
         self.load_from_file()
+
+    @Slot(result=str)
+    def getDefaultSpreadsheetName(self):
+        """Generate a default spreadsheet name not already used."""
+        existing_names = self.getSpreadsheetNames()
+        i = 1
+        while f"Default_{i}" in existing_names:
+            i += 1
+        return f"Default_{i}"
+
+    @Slot(result=list)
+    def getSpreadsheetNames(self):
+        """Return a list of saved spreadsheet names."""
+        try:
+            return [f.stem for f in Path("data/spreadsheets").glob("*.json")]
+        except Exception as e:
+            print(f"Error fetching spreadsheet names: {str(e)}")
+            return []
+
+    @Slot(str)
+    def setSpreadsheetName(self, name):
+        """Set the current spreadsheet name."""
+        self.current_spreadsheet_name = name
+        self.save_to_file()
+
+    @Slot(str)
+    def loadSpreadsheet(self, name):
+        """Load a spreadsheet by name."""
+        self.current_spreadsheet_name = name
+        self.load_from_file(f"data/spreadsheets/{name}.json")
 
     def rowCount(self, parent=None):
         return self._rows_nb
@@ -116,8 +148,10 @@ class SpreadsheetModel(QAbstractTableModel):
     def roleNames(self):
         return {Qt.DisplayRole: b"display"}
     
-    def save_to_file(self, filename=r"data\spreadsheets\spreadsheet.json"):
-        """Save model data to a JSON file"""
+    def save_to_file(self, filename=None):
+        """Save model data to a JSON file."""
+        if not filename:
+            filename = f"data/spreadsheets/{self.current_spreadsheet_name}.json"
         data = {
             "max_row": self._used_rows_nb,
             "max_col": self._used_cols_nb,
@@ -126,8 +160,10 @@ class SpreadsheetModel(QAbstractTableModel):
         with open(filename, 'w') as f:
             json.dump(data, f)
 
-    def load_from_file(self, filename="spreadsheet.json"):
-        """Load model data from a JSON file"""
+    def load_from_file(self, filename=None):
+        """Load model data from a JSON file."""
+        if not filename:
+            filename = f"data/spreadsheets/{self.current_spreadsheet_name}.json"
         try:
             with open(filename, 'r') as f:
                 data = json.load(f)

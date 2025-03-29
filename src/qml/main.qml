@@ -138,4 +138,64 @@ Window {
         }
     }
 
+    Rectangle {
+        id: floatingWindow
+        width: 200
+        height: 100
+        color: "lightblue"
+        x: tableView.x + 10  // Initial position slightly inside the TableView
+        y: tableView.y + 10
+        z: 1  // Ensures the floating window stays above other elements
+
+        MouseArea {
+            anchors.fill: parent
+            drag.target: floatingWindow
+            drag.axis: Drag.XAndYAxis
+            drag.minimumX: tableView.x
+            drag.maximumX: tableView.x + tableView.width - verticalScrollbar.width - floatingWindow.width
+            drag.minimumY: tableView.y
+            drag.maximumY: tableView.y + tableView.height - horizontalScrollbar.height - floatingWindow.height
+        }
+
+        Column {
+            anchors.centerIn: parent
+            spacing: 5
+
+            RowLayout {
+                spacing: 5
+                TextInput {
+                    id: spreadsheetNameInput
+                    placeholderText: "Enter spreadsheet name"
+                    text: spreadsheetModel.currentSpreadsheetName || "Default"
+                    onEditingFinished: {
+                        if (text.trim() === "") {
+                            text = spreadsheetModel.getDefaultSpreadsheetName();
+                        }
+                        spreadsheetModel.setSpreadsheetName(text);
+                    }
+                }
+                Button {
+                    text: "List"
+                    onClicked: {
+                        var names = spreadsheetModel.getSpreadsheetNames();
+                        if (names.length > 0) {
+                            var selectedName = names[0]; // Replace with dropdown logic
+                            spreadsheetModel.loadSpreadsheet(selectedName);
+                            spreadsheetNameInput.text = selectedName;
+                        }
+                    }
+                }
+            }
+
+            Button {
+                text: "Button 1"
+                width: 80
+            }
+            Button {
+                text: "Button 2"
+                width: 80
+            }
+        }
+    }
+
 }
