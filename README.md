@@ -1,0 +1,38 @@
+
+|-- config
+    |-- settings.py
+|-- data
+    |-- backups
+    |-- spreadsheets
+        |-- spreadsheet.json
+|-- resources
+    |-- templates
+|-- src
+    |-- models
+        |-- __init__.py
+        |-- spreadsheet_model.py
+    |-- qml
+        |-- components
+            |-- CellDelegate.qml
+        |-- view
+        |-- main.qml
+        |-- resources.qrc
+    |-- services
+    |-- __init__.py
+    |-- main.py
+|-- tests
+    |-- gui
+        |-- test_user_workflows.py
+        |-- test_window_flows.py
+    |-- qml
+        |-- components
+            |-- Test_CellDelegate.qml
+        |-- qmltest
+        |-- Test_SpreadsheetView.qml
+    |-- unit
+        |-- test_models
+        |-- test_services
+    |-- __init__.py
+|-- .gitignore
+|-- README.md
+|-- requirements.txt
