@@ -8,13 +8,14 @@ from PySide6.QtQml import QQmlApplicationEngine
 class SpreadsheetModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.c = False
         self._data = []
         self._rows_nb = 0
         self._columns_nb = 0
-        self._used_rows_nb = -1  # Track the highest edited row index
-        self._used_cols_nb = -1  # Track the highest edited column index
-        self.current_spreadsheet_name = "Default"
+        self.collectionName = "collection_1"
+        self._maxRow = 0
+        self._maxColumn = 0
+        self._collection = {"maxRow": self._maxRow, "maxColumn": self._maxColumn, "data": self._data}
+        self._collections = {"data": {self.collectionName: self._collection}, "collectionName": self.collectionName}
         self.load_from_file()
 
     @Slot(result=str)
@@ -38,13 +39,13 @@ class SpreadsheetModel(QAbstractTableModel):
     @Slot(str)
     def setSpreadsheetName(self, name):
         """Set the current spreadsheet name."""
-        self.current_spreadsheet_name = name
+        self.collectionName = name
         self.save_to_file()
 
     @Slot(str)
     def loadSpreadsheet(self, name):
         """Load a spreadsheet by name."""
-        self.current_spreadsheet_name = name
+        self.collectionName = name
         self.load_from_file(f"data/spreadsheets/{name}.json")
 
     def rowCount(self, parent=None):
@@ -52,14 +53,6 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def columnCount(self, parent=None):
         return self._columns_nb
-    
-    @Slot(result=int)
-    def get_used_rows_nb(self):
-        return self._used_rows_nb
-    
-    @Slot(result=int)
-    def get_used_cols_nb(self):
-        return self._used_cols_nb
 
     def data(self, index, role=Qt.DisplayRole):
         if role == Qt.DisplayRole and index.isValid():
@@ -71,10 +64,12 @@ class SpreadsheetModel(QAbstractTableModel):
             row = index.row()
             col = index.column()
             self._data[row][col] = value
-            if row > self._used_rows_nb:
-                self._used_rows_nb = row
-            if col > self._used_cols_nb:
-                self._used_cols_nb = col
+            if row >= self._maxRow:
+                self._maxRow = row + 1
+                self._collection["maxRow"] = self._maxRow
+            if col >= self._maxColumn:
+                self._maxColumn = col + 1
+                self._collection["maxColumn"] = self._maxColumn
             # Emit dataChanged for both EditRole and DisplayRole
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
             self.save_to_file()
@@ -121,9 +116,8 @@ class SpreadsheetModel(QAbstractTableModel):
     
     @Slot(int)
     def setColumns(self, count):
-        if count < 0 or self.c:
+        if count < 0:
             return
-        # self.c = True
         if count < self._columns_nb:
             self.beginRemoveColumns(QModelIndex(), count, self._columns_nb - 1)
             for row in self._data:
@@ -139,11 +133,11 @@ class SpreadsheetModel(QAbstractTableModel):
 
     @Slot(result=int)
     def getMaxRow(self):
-        return self._used_rows_nb
+        return self._maxRow
 
     @Slot(result=int)
     def getMaxColumn(self):
-        return self._used_cols_nb
+        return self._maxColumn
 
     def roleNames(self):
         return {Qt.DisplayRole: b"display"}
@@ -151,28 +145,28 @@ class SpreadsheetModel(QAbstractTableModel):
     def save_to_file(self, filename=None):
         """Save model data to a JSON file."""
         if not filename:
-            filename = f"data/spreadsheets/{self.current_spreadsheet_name}.json"
-        data = {
-            "max_row": self._used_rows_nb,
-            "max_col": self._used_cols_nb,
-            "data": self._data
-        }
+            filename = f"data/spreadsheets/{self.collectionName}.json"
+        Path("data/spreadsheets").mkdir(parents=True, exist_ok=True)
         with open(filename, 'w') as f:
-            json.dump(data, f)
+            json.dump(self._collections, f)
 
     def load_from_file(self, filename=None):
         """Load model data from a JSON file."""
         if not filename:
-            filename = f"data/spreadsheets/{self.current_spreadsheet_name}.json"
+            filename = f"data/spreadsheets/{self.collectionName}.json"
         try:
             with open(filename, 'r') as f:
-                data = json.load(f)
+                collections = json.load(f)
             
-            self.beginResetModel()
-            self._used_rows_nb = data["max_row"]
-            self._used_cols_nb = data["max_col"]
-            self._data = data["data"]
-            self.endResetModel()
+            if collections:
+                self.beginResetModel()
+                self._collections = collections
+                self._collectionName = self._collections["collectionName"]
+                self._collection = self._collections["data"][self._collectionName]
+                self._data = self._collection["data"]
+                self._maxRow = self._collection["maxRow"]
+                self._maxColumn = self._collection["maxColumn"]
+                self.endResetModel()
         except FileNotFoundError:
             # No saved data, initialize with defaults if needed
             pass

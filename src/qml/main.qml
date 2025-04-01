@@ -62,8 +62,8 @@ Window {
 
             // Initialize with enough rows/columns to make scrollbars appear
             Component.onCompleted: {
-                const initRows = Math.max(spreadsheetModel.get_used_rows_nb(), Math.floor(height / cellHeight + 1))
-                const initCols = Math.max(spreadsheetModel.get_used_cols_nb(), Math.floor(width / cellWidth + 1))
+                const initRows = Math.max(spreadsheetModel.getMaxRow(), Math.floor(height / cellHeight + 1))
+                const initCols = Math.max(spreadsheetModel.getMaxColumn(), Math.floor(width / cellWidth + 1))
                 spreadsheetModel.setRows(initRows)
                 spreadsheetModel.setColumns(initCols)
             }
@@ -159,43 +159,19 @@ Window {
 
         Column {
             anchors.centerIn: parent
-            spacing: 5
+            spacing: 10
 
-            RowLayout {
-                spacing: 5
-                TextInput {
-                    id: spreadsheetNameInput
-                    // Remove placeholderText and use a workaround
-                    text: spreadsheetModel.currentSpreadsheetName || "Default"
-                    onEditingFinished: {
-                        if (text.trim() === "") {
-                            text = spreadsheetModel.getDefaultSpreadsheetName();
-                        }
-                        spreadsheetModel.setSpreadsheetName(text);
-                    }
-
-                    // Placeholder workaround
-                    Rectangle {
-                        anchors.fill: parent
-                        color: "transparent"
-                        visible: spreadsheetNameInput.text === ""
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Enter spreadsheet name"
-                            color: "gray"
-                        }
-                    }
-                }
-                Button {
-                    text: "List"
-                    onClicked: {
-                        var names = spreadsheetModel.getSpreadsheetNames();
-                        if (names.length > 0) {
-                            var selectedName = names[0]; // Replace with dropdown logic
-                            spreadsheetModel.loadSpreadsheet(selectedName);
-                            spreadsheetNameInput.text = selectedName;
-                        }
-                    }
+            // Editable ComboBox with a dropdown arrow
+            ComboBox {
+                id: preparedInputComboBox
+                width: parent.width * 0.9
+                editable: true
+                model: ["Option 1", "Option 2", "Option 3"]
+                placeholderText: "Select or enter input"
+                contentItem: TextField {
+                    id: comboTextField
+                    anchors.fill: parent
+                    clearButtonVisible: true  // Enables the cross sign for clearing the field
                 }
             }
 
