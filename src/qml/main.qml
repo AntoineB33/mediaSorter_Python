@@ -166,7 +166,7 @@ Window {
                 id: preparedInputComboBox
                 width: parent.width * 0.9
                 editable: true
-                model: ["Option 1", "Option 2", "Option 3"]
+                model: spreadsheetModel.getExistingCollectionNames()
                 placeholderText: "Select or enter input"
                 contentItem: TextField {
                     id: comboTextField

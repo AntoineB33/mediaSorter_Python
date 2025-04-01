@@ -141,6 +141,10 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def roleNames(self):
         return {Qt.DisplayRole: b"display"}
+
+    def getExistingCollectionNames(self):
+        """Return a list of existing collection names."""
+        return list(self._collections["data"].keys())
     
     def save_to_file(self, filename=None):
         """Save model data to a JSON file."""
