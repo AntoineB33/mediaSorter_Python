@@ -159,29 +159,62 @@ Window {
 
         Column {
             anchors.centerIn: parent
-            spacing: 10
+            spacing: 5  // Reduced spacing from 10 to 5
 
-            // Editable ComboBox with a dropdown arrow
             ComboBox {
                 id: preparedInputComboBox
                 width: parent.width * 0.9
+                height: 30  // Explicit height
                 editable: true
                 model: spreadsheetModel.getExistingCollectionNames()
-                placeholderText: "Select or enter input"
+
                 contentItem: TextField {
                     id: comboTextField
                     anchors.fill: parent
-                    clearButtonVisible: true  // Enables the cross sign for clearing the field
+                    text: preparedInputComboBox.editText
+                    placeholderText: "Select or enter input"
+                    selectByMouse: true
+                    font.pixelSize: 10  // Smaller font size
+                    verticalAlignment: TextInput.AlignVCenter
+
+                    onTextEdited: preparedInputComboBox.editText = text
+                }
+
+                background: Rectangle {
+                    border.color: "#cccccc"
+                    radius: 4
+                }
+
+                RoundButton {
+                    id: clearSearch
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.margins: 2
+                    width: 16
+                    height: 16
+                    text: "×"
+                    font.pixelSize: 10  // Smaller close button
+                    opacity: 0.5
+
+                    onClicked: {
+                        comboTextField.clear()
+                        comboTextField.forceActiveFocus()
+                    }
                 }
             }
 
             Button {
                 text: "Button 1"
                 width: 80
+                height: 25  // Explicit height
+                font.pixelSize: 10  // Smaller font
             }
+            
             Button {
                 text: "Button 2"
                 width: 80
+                height: 25  // Explicit height
+                font.pixelSize: 10  // Smaller font
             }
         }
     }

@@ -9,6 +9,9 @@ from PySide6.QtQml import QQmlApplicationEngine
 from models.spreadsheet_model import SpreadsheetModel
 
 def main():
+    # Set the QT_QUICK_CONTROLS_STYLE environment variable
+    os.environ["QT_QUICK_CONTROLS_STYLE"] = "Material"
+
     app = QGuiApplication(sys.argv)
     model = SpreadsheetModel()
     
