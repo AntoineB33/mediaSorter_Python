@@ -141,7 +141,7 @@ Window {
     Rectangle {
         id: floatingWindow
         width: 200
-        height: 100
+        height: 200
         color: "lightblue"
         x: tableView.x + 10  // Initial position slightly inside the TableView
         y: tableView.y + 10
@@ -158,15 +158,21 @@ Window {
         }
 
         Column {
-            anchors.centerIn: parent
-            spacing: 5  // Reduced spacing from 10 to 5
+            anchors {
+                fill: parent
+                margins: 10  // Add padding inside the blue window
+            }
+            spacing: 5
 
             ComboBox {
                 id: preparedInputComboBox
-                width: parent.width * 0.9
-                height: 30  // Explicit height
+                width: parent.width - 10
                 editable: true
                 model: spreadsheetModel.getExistingCollectionNames()
+                
+                // Use implicit height with minimum size
+                implicitHeight: 30
+                font.pixelSize: 12
 
                 contentItem: TextField {
                     id: comboTextField
@@ -174,7 +180,8 @@ Window {
                     text: preparedInputComboBox.editText
                     placeholderText: "Select or enter input"
                     selectByMouse: true
-                    font.pixelSize: 10  // Smaller font size
+                    font: preparedInputComboBox.font
+                    padding: 5
                     verticalAlignment: TextInput.AlignVCenter
 
                     onTextEdited: preparedInputComboBox.editText = text
@@ -187,13 +194,15 @@ Window {
 
                 RoundButton {
                     id: clearSearch
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.margins: 2
-                    width: 16
-                    height: 16
+                    anchors {
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        margins: 2
+                    }
+                    width: 20
+                    height: 20
                     text: "×"
-                    font.pixelSize: 10  // Smaller close button
+                    font.pixelSize: 12
                     opacity: 0.5
 
                     onClicked: {
@@ -205,16 +214,30 @@ Window {
 
             Button {
                 text: "Button 1"
-                width: 80
-                height: 25  // Explicit height
-                font.pixelSize: 10  // Smaller font
+                width: parent.width - 10  // Dynamically adjust width
+                height: (parent.height - 20) / 2 - 5  // Divide space equally between buttons with spacing
+                font.pixelSize: Math.min(width, height) * 0.3  // Adjust font size proportionally
+                padding: Math.min(width, height) * 0.1  // Adjust padding proportionally
+                anchors.horizontalCenter: parent.horizontalCenter
+                background: Rectangle {
+                    color: parent.down ? "#d0d0d0" : "#f0f0f0"
+                    radius: 4
+                }
+                Component.onCompleted: console.log("Button 1 font.pixelSize:", font.pixelSize)  // Debugging
             }
             
             Button {
                 text: "Button 2"
-                width: 80
-                height: 25  // Explicit height
-                font.pixelSize: 10  // Smaller font
+                width: parent.width - 10  // Dynamically adjust width
+                height: (parent.height - 20) / 2 - 5  // Divide space equally between buttons with spacing
+                font.pixelSize: Math.min(width, height) * 0.3  // Adjust font size proportionally
+                padding: Math.min(width, height) * 0.1  // Adjust padding proportionally
+                anchors.horizontalCenter: parent.horizontalCenter
+                background: Rectangle {
+                    color: parent.down ? "#d0d0d0" : "#f0f0f0"
+                    radius: 4
+                }
+                Component.onCompleted: console.log("Button 2 font.pixelSize:", font.pixelSize)  // Debugging
             }
         }
     }
