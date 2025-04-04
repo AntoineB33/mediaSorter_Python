@@ -1,66 +1,68 @@
 import QtQuick 2.15
 import QtQuick.Window 2.15
 import QtQuick.Controls 2.15
-import QtQuick.Controls.Material 2.15  // Add material style
 import QtQuick.Layouts 1.15
 
-ApplicationWindow {  // Changed from Window to ApplicationWindow
+ApplicationWindow {
     width: 300
     height: 150
     visible: true
     title: "TextField with Clear Button"
-    
-    // Set style to Material (or Fusion)
-    Material.theme: Material.Light
-    Material.accent: Material.Blue
 
     ColumnLayout {
         anchors.centerIn: parent
         spacing: 20
 
-        TextField {
-            id: inputField
-            placeholderText: "Type something..."
+        Item {
             Layout.preferredWidth: 200
-            font.pixelSize: 16
-            padding: 10
-            rightPadding: 30
+            Layout.preferredHeight: 40
 
-            // Add clear button
-            Button {
-                id: clearButton
-                anchors.right: parent.right
-                anchors.rightMargin: 5
-                anchors.verticalCenter: parent.verticalCenter
-                width: 20
-                height: 20
-                flat: true
-                text: "×"
-                font.pixelSize: 18
-                visible: inputField.text.length > 0
-                onClicked: inputField.text = ""
+            TextField {
+                id: inputField
+                anchors.fill: parent
+                placeholderText: "Type something..."
+                font.pixelSize: 16
+                padding: 10
+                rightPadding: 30  // Space for clear button
 
                 background: Rectangle {
-                    color: "transparent"
+                    color: "#ffffff"
+                    border.color: inputField.activeFocus ? "#2196F3" : "#cccccc"
+                    border.width: 1
+                    radius: 5
+                }
+            }
+
+            // Clear button
+            Rectangle {
+                id: clearButton
+                anchors {
+                    right: parent.right
+                    verticalCenter: parent.verticalCenter
+                    margins: 10
+                }
+                width: 20
+                height: 20
+                color: "transparent"
+                visible: inputField.text.length > 0
+
+                Text {
+                    text: "×"
+                    anchors.centerIn: parent
+                    font.pixelSize: 18
+                    color: "#666"
                 }
 
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
+                    onClicked: inputField.text = ""
+                    
+                    // Hover effects
                     hoverEnabled: true
-                    onEntered: parent.opacity = 0.7
-                    onExited: parent.opacity = 1.0
+                    onEntered: parent.color = "#f0f0f0"
+                    onExited: parent.color = "transparent"
                 }
-            }
-
-            // Proper background implementation
-            background: Rectangle {
-                implicitWidth: 200
-                implicitHeight: 40
-                color: inputField.enabled ? "#ffffff" : "#f6f6f6"
-                border.color: inputField.activeFocus ? Material.accentColor : "#cccccc"
-                border.width: 1
-                radius: 5
             }
         }
     }
