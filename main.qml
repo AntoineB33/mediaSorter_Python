@@ -23,7 +23,20 @@ ApplicationWindow {
                 placeholderText: "Type something..."
                 font.pixelSize: 16
                 padding: 10
-                rightPadding: 30  // Space for clear button
+                rightPadding: 30
+    
+                // Universal text properties
+                color: "#333333"  // Text color
+                selectionColor: "#2196F3"  // Only use universally supported properties
+
+                // Custom cursor implementation
+                cursorDelegate: Rectangle {
+                    visible: inputField.cursorVisible
+                    color: "#2196F3"
+                    width: 2
+                    height: inputField.font.pixelSize + 4
+                    y: 2
+                }
 
                 background: Rectangle {
                     color: "#ffffff"
@@ -33,7 +46,6 @@ ApplicationWindow {
                 }
             }
 
-            // Clear button
             Rectangle {
                 id: clearButton
                 anchors {
@@ -57,8 +69,6 @@ ApplicationWindow {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: inputField.text = ""
-                    
-                    // Hover effects
                     hoverEnabled: true
                     onEntered: parent.color = "#f0f0f0"
                     onExited: parent.color = "transparent"
