@@ -1,12 +1,18 @@
+File Hierarchy:
 
+|-- .vscode
+    |-- launch.json
 |-- config
     |-- settings.py
 |-- data
     |-- backups
+        |-- v1
     |-- spreadsheets
-        |-- spreadsheet.json
+        |-- collection_1.json
 |-- resources
+    |-- assets
     |-- templates
+    |-- theme
 |-- src
     |-- models
         |-- __init__.py
@@ -16,7 +22,6 @@
             |-- CellDelegate.qml
         |-- view
         |-- main.qml
-        |-- resources.qrc
     |-- services
     |-- __init__.py
     |-- main.py
@@ -27,15 +32,21 @@
     |-- qml
         |-- components
             |-- Test_CellDelegate.qml
-        |-- qmltest
+        |-- models
+        |-- services
         |-- Test_SpreadsheetView.qml
     |-- unit
-        |-- test_models
-        |-- test_services
+        |-- models
+            |-- __init__.py
+            |-- test_spreadsheet_model.py
+        |-- services
+            |-- __init__.py
+            |-- test_data_processing.py
     |-- __init__.py
 |-- .gitignore
 |-- README.md
 |-- requirements.txt
+|-- resources.qrc
 
 
 
