@@ -181,10 +181,12 @@ Window {
                     color: "black"
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignLeft // Explicit left alignment
+                    leftPadding: 5  // Ensures consistent left spacing
                     
                     // Confine text to the available space (parent width - clear button area)
                     anchors {
                         left: parent.left
+                        // leftMargin: 5
                         right: parent.right
                         rightMargin: 50 // Space for clear button (30px margin + 20px button width)
                     }
@@ -218,29 +220,25 @@ Window {
             Button {
                 text: "Button 1"
                 width: parent.width - 10  // Dynamically adjust width
-                height: (parent.height - 20) / 2 - 5  // Divide space equally between buttons with spacing
-                font.pixelSize: Math.min(width, height) * 0.3  // Adjust font size proportionally
-                padding: Math.min(width, height) * 0.1  // Adjust padding proportionally
+                font.pixelSize: 12
+                padding: 10
                 anchors.horizontalCenter: parent.horizontalCenter
                 background: Rectangle {
                     color: parent.down ? "#d0d0d0" : "#f0f0f0"
                     radius: 4
                 }
-                Component.onCompleted: console.log("Button 1 font.pixelSize:", font.pixelSize)  // Debugging
             }
             
             Button {
                 text: "Button 2"
                 width: parent.width - 10  // Dynamically adjust width
-                height: (parent.height - 20) / 2 - 5  // Divide space equally between buttons with spacing
-                font.pixelSize: Math.min(width, height) * 0.3  // Adjust font size proportionally
-                padding: Math.min(width, height) * 0.1  // Adjust padding proportionally
+                font.pixelSize: 12
+                padding: 10
                 anchors.horizontalCenter: parent.horizontalCenter
                 background: Rectangle {
                     color: parent.down ? "#d0d0d0" : "#f0f0f0"
                     radius: 4
                 }
-                Component.onCompleted: console.log("Button 2 font.pixelSize:", font.pixelSize)  // Debugging
             }
         }
     }
