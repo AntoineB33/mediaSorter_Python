@@ -145,7 +145,6 @@ class SpreadsheetModel(QAbstractTableModel):
     @Slot(result=list)
     def getExistingCollectionNames(self):
         """Return a list of existing collection names."""
-        return ["option1", "option2", "option3"]
         return list(self._collections["data"].keys())
     
     def save_to_file(self, filename=None):

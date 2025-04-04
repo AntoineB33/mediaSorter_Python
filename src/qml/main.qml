@@ -174,19 +174,6 @@ Window {
                 implicitHeight: 30
                 font.pixelSize: 12
 
-                contentItem: TextField {
-                    id: comboTextField
-                    anchors.fill: parent
-                    text: preparedInputComboBox.editText
-                    placeholderText: "Select or enter input"
-                    selectByMouse: true
-                    font: preparedInputComboBox.font
-                    padding: 5
-                    verticalAlignment: TextInput.AlignVCenter
-
-                    onTextEdited: preparedInputComboBox.editText = text
-                }
-
                 background: Rectangle {
                     border.color: "#cccccc"
                     radius: 4
@@ -197,13 +184,13 @@ Window {
                     anchors {
                         right: parent.right
                         verticalCenter: parent.verticalCenter
-                        margins: 2
+                        margins: 30  // Increase the margin to move it slightly to the left
                     }
                     width: 20
                     height: 20
                     text: "×"
                     font.pixelSize: 12
-                    opacity: 0.5
+                    // opacity: 0.5
 
                     onClicked: {
                         comboTextField.clear()
