@@ -169,10 +169,26 @@ Window {
                 width: parent.width - 10
                 editable: true
                 model: spreadsheetModel.getExistingCollectionNames()
-                
+                clip: true
                 // Use implicit height with minimum size
                 implicitHeight: 30
                 font.pixelSize: 12
+
+                // Add padding to the right to prevent text from going behind the clear button
+                contentItem: TextInput {
+                    text: preparedInputComboBox.displayText
+                    font: preparedInputComboBox.font
+                    color: "black"
+                    verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignLeft // Explicit left alignment
+                    
+                    // Confine text to the available space (parent width - clear button area)
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        rightMargin: 50 // Space for clear button (30px margin + 20px button width)
+                    }
+                }
 
                 background: Rectangle {
                     border.color: "#cccccc"
@@ -193,8 +209,8 @@ Window {
                     // opacity: 0.5
 
                     onClicked: {
-                        comboTextField.clear()
-                        comboTextField.forceActiveFocus()
+                        preparedInputComboBox.editText = ""  // Correct property assignment
+                        preparedInputComboBox.forceActiveFocus()
                     }
                 }
             }
