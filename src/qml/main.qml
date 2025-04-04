@@ -181,12 +181,11 @@ Window {
                     color: "black"
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignLeft // Explicit left alignment
-                    leftPadding: 5  // Ensures consistent left spacing
                     
                     // Confine text to the available space (parent width - clear button area)
                     anchors {
                         left: parent.left
-                        // leftMargin: 5
+                        leftMargin: 5
                         right: parent.right
                         rightMargin: 50 // Space for clear button (30px margin + 20px button width)
                     }
