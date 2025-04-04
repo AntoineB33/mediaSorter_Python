@@ -1,13 +1,18 @@
 import QtQuick 2.15
 import QtQuick.Window 2.15
 import QtQuick.Controls 2.15
+import QtQuick.Controls.Material 2.15  // Add material style
 import QtQuick.Layouts 1.15
 
-Window {
+ApplicationWindow {  // Changed from Window to ApplicationWindow
     width: 300
     height: 150
     visible: true
     title: "TextField with Clear Button"
+    
+    // Set style to Material (or Fusion)
+    Material.theme: Material.Light
+    Material.accent: Material.Blue
 
     ColumnLayout {
         anchors.centerIn: parent
@@ -19,64 +24,41 @@ Window {
             Layout.preferredWidth: 200
             font.pixelSize: 16
             padding: 10
-            rightPadding: 30  // Make space for the X button
+            rightPadding: 30
 
-            // Clear button implementation
-            Text {
+            // Add clear button
+            Button {
                 id: clearButton
-                anchors {
-                    verticalCenter: parent.verticalCenter
-                    right: parent.right
-                    rightMargin: 10
-                }
+                anchors.right: parent.right
+                anchors.rightMargin: 5
+                anchors.verticalCenter: parent.verticalCenter
+                width: 20
+                height: 20
+                flat: true
                 text: "×"
-                font.pixelSize: 20
-                color: "#666"
+                font.pixelSize: 18
                 visible: inputField.text.length > 0
+                onClicked: inputField.text = ""
+
+                background: Rectangle {
+                    color: "transparent"
+                }
 
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: {
-                        inputField.text = ""
-                        inputField.forceActiveFocus()
-                    }
-                }
-
-                // Hover effects
-                states: [
-                    State {
-                        name: "hovered"
-                        when: clearButtonMouse.containsMouse
-                        PropertyChanges {
-                            target: clearButton
-                            color: "#333"
-                            scale: 1.1
-                        }
-                    },
-                    State {
-                        name: "pressed"
-                        when: clearButtonMouse.pressed
-                        PropertyChanges {
-                            target: clearButton
-                            color: "#000"
-                            scale: 0.9
-                        }
-                    }
-                ]
-
-                HoverHandler {
-                    id: clearButtonMouse
                     cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
+                    onEntered: parent.opacity = 0.7
+                    onExited: parent.opacity = 1.0
                 }
-
-                Behavior on color { ColorAnimation { duration: 100 } }
-                Behavior on scale { NumberAnimation { duration: 100 } }
             }
 
-            // Custom background
+            // Proper background implementation
             background: Rectangle {
-                color: "#f0f0f0"
-                border.color: inputField.activeFocus ? "#2196F3" : "#ccc"
+                implicitWidth: 200
+                implicitHeight: 40
+                color: inputField.enabled ? "#ffffff" : "#f6f6f6"
+                border.color: inputField.activeFocus ? Material.accentColor : "#cccccc"
                 border.width: 1
                 radius: 5
             }
