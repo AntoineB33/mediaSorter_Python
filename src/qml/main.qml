@@ -176,7 +176,7 @@ Window {
 
                 // Add padding to the right to prevent text from going behind the clear button
                 contentItem: TextInput {
-                    text: preparedInputComboBox.displayText
+                    text: preparedInputComboBox.editText // Bind to editText instead of displayText
                     font: preparedInputComboBox.font
                     color: "black"
                     verticalAlignment: Text.AlignVCenter
@@ -210,7 +210,8 @@ Window {
                     // opacity: 0.5
 
                     onClicked: {
-                        preparedInputComboBox.editText = ""  // Correct property assignment
+                        preparedInputComboBox.editText = "" // Clear the editable text
+                        preparedInputComboBox.currentIndex = 0 // Reset the selected index
                         preparedInputComboBox.forceActiveFocus()
                     }
                 }
