@@ -10,6 +10,7 @@ ApplicationWindow {
     title: "TextField with Dropdown"
 
     property var recommendations: ["Apple", "Banana", "Cherry", "Date", "Elderberry"]
+    property bool showDropdown: false
 
     ColumnLayout {
         anchors.centerIn: parent
@@ -25,7 +26,7 @@ ApplicationWindow {
                 placeholderText: "Type something..."
                 font.pixelSize: 16
                 padding: 10
-                rightPadding: 60  // Space for both buttons
+                rightPadding: 40  // Space for clear button
                 color: "#333333"
                 selectionColor: "#2196F3"
 
@@ -44,17 +45,14 @@ ApplicationWindow {
                     radius: 5
                 }
 
-                onTextChanged: {
-                    // Add your recommendation filtering logic here
-                    dropdown.visible = text.length > 0
-                }
+                onActiveFocusChanged: showDropdown = activeFocus
             }
 
             // Clear button
             Rectangle {
                 id: clearButton
                 anchors {
-                    right: dropdownButton.left
+                    right: parent.right
                     verticalCenter: parent.verticalCenter
                     margins: 10
                 }
@@ -73,39 +71,7 @@ ApplicationWindow {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        inputField.text = ""
-                        dropdown.visible = false
-                    }
-                    hoverEnabled: true
-                    onEntered: parent.color = "#f0f0f0"
-                    onExited: parent.color = "transparent"
-                }
-            }
-
-            // Dropdown button
-            Rectangle {
-                id: dropdownButton
-                anchors {
-                    right: parent.right
-                    verticalCenter: parent.verticalCenter
-                    margins: 10
-                }
-                width: 20
-                height: 20
-                color: "transparent"
-
-                Text {
-                    text: "▼"
-                    anchors.centerIn: parent
-                    font.pixelSize: 12
-                    color: "#666"
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: dropdown.visible = !dropdown.visible
+                    onClicked: inputField.text = ""
                     hoverEnabled: true
                     onEntered: parent.color = "#f0f0f0"
                     onExited: parent.color = "transparent"
@@ -116,12 +82,12 @@ ApplicationWindow {
         // Dropdown list using Popup
         Popup {
             id: dropdown
-            y: inputField.height + 5  // Position below the TextField
+            y: inputField.height + 5
             x: inputField.x
             width: inputField.width
             height: 150
             padding: 0
-            visible: false
+            visible: showDropdown
 
             background: Rectangle {
                 color: "#ffffff"
@@ -153,10 +119,7 @@ ApplicationWindow {
                         id: mouseArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: {
-                            inputField.text = modelData
-                            dropdown.visible = false
-                        }
+                        onClicked: inputField.text = modelData
                     }
                 }
 
@@ -166,7 +129,7 @@ ApplicationWindow {
             }
         }
 
-        // Add two buttons below the existing layout
+        // Buttons
         RowLayout {
             spacing: 10
             Layout.alignment: Qt.AlignHCenter
