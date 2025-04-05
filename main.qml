@@ -111,53 +111,57 @@ ApplicationWindow {
                     onExited: parent.color = "transparent"
                 }
             }
+        }
 
-            // Dropdown list
-            Rectangle {
-                id: dropdown
-                width: parent.width
-                height: 150
-                visible: false
-                anchors.top: inputField.bottom
-                anchors.topMargin: 5
+        // Dropdown list using Popup
+        Popup {
+            id: dropdown
+            y: inputField.height + 5  // Position below the TextField
+            x: inputField.x
+            width: inputField.width
+            height: 150
+            padding: 0
+            visible: false
+
+            background: Rectangle {
                 color: "#ffffff"
                 border.color: "#cccccc"
                 radius: 5
+            }
 
-                ListView {
-                    id: listView
-                    anchors.fill: parent
-                    anchors.margins: 5
-                    clip: true
-                    model: recommendations
+            contentItem: ListView {
+                id: listView
+                anchors.fill: parent
+                anchors.margins: 5
+                clip: true
+                model: recommendations
 
-                    delegate: Rectangle {
-                        width: listView.width
-                        height: 30
-                        color: mouseArea.containsMouse ? "#f0f0f0" : "transparent"
+                delegate: Rectangle {
+                    width: listView.width
+                    height: 30
+                    color: mouseArea.containsMouse ? "#f0f0f0" : "transparent"
 
-                        Text {
-                            text: modelData
-                            anchors.verticalCenter: parent.verticalCenter
-                            leftPadding: 10
-                            font.pixelSize: 14
-                            color: "#333333"
-                        }
-
-                        MouseArea {
-                            id: mouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: {
-                                inputField.text = modelData
-                                dropdown.visible = false
-                            }
-                        }
+                    Text {
+                        text: modelData
+                        anchors.verticalCenter: parent.verticalCenter
+                        leftPadding: 10
+                        font.pixelSize: 14
+                        color: "#333333"
                     }
 
-                    ScrollBar.vertical: ScrollBar {
-                        policy: ScrollBar.AsNeeded
+                    MouseArea {
+                        id: mouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: {
+                            inputField.text = modelData
+                            dropdown.visible = false
+                        }
                     }
+                }
+
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
                 }
             }
         }
