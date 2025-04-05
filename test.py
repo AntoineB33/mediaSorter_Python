@@ -80,5 +80,6 @@ if __name__ == "__main__":
 
     table = [[] for i in range(50)]
     table[0] = ["after 1", "as far as possible from 1"]
+    table[1] = ["after 2", "as far as possible from 2"]
 
     print(find_valid_sortings(table))
