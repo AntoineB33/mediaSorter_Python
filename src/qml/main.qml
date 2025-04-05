@@ -140,8 +140,8 @@ Window {
 
     Rectangle {
         id: floatingWindow
-        width: 200
-        height: 200
+        width: 400
+        height: 400
         color: "lightblue"
         x: tableView.x + 10  // Initial position slightly inside the TableView
         y: tableView.y + 10
@@ -158,88 +158,6 @@ Window {
         }
 
         Column {
-            anchors {
-                fill: parent
-                margins: 10  // Add padding inside the blue window
-            }
-            spacing: 5
-
-            ComboBox {
-                id: preparedInputComboBox
-                width: parent.width - 10
-                editable: true
-                model: spreadsheetModel.getExistingCollectionNames()
-                clip: true
-                // Use implicit height with minimum size
-                implicitHeight: 30
-                font.pixelSize: 12
-
-                // Add padding to the right to prevent text from going behind the clear button
-                contentItem: TextInput {
-                    text: preparedInputComboBox.editText // Bind to editText instead of displayText
-                    font: preparedInputComboBox.font
-                    color: "black"
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignLeft // Explicit left alignment
-                    
-                    // Confine text to the available space (parent width - clear button area)
-                    anchors {
-                        left: parent.left
-                        leftMargin: 5
-                        right: parent.right
-                        rightMargin: 50 // Space for clear button (30px margin + 20px button width)
-                    }
-                }
-
-                background: Rectangle {
-                    border.color: "#cccccc"
-                    radius: 4
-                }
-
-                RoundButton {
-                    id: clearSearch
-                    anchors {
-                        right: parent.right
-                        verticalCenter: parent.verticalCenter
-                        margins: 30  // Increase the margin to move it slightly to the left
-                    }
-                    width: 20
-                    height: 20
-                    text: "×"
-                    font.pixelSize: 12
-                    // opacity: 0.5
-
-                    onClicked: {
-                        preparedInputComboBox.editText = "" // Clear the editable text
-                        preparedInputComboBox.currentIndex = 0 // Reset the selected index
-                        preparedInputComboBox.forceActiveFocus()
-                    }
-                }
-            }
-
-            Button {
-                text: "Button 1"
-                width: parent.width - 10  // Dynamically adjust width
-                font.pixelSize: 12
-                padding: 10
-                anchors.horizontalCenter: parent.horizontalCenter
-                background: Rectangle {
-                    color: parent.down ? "#d0d0d0" : "#f0f0f0"
-                    radius: 4
-                }
-            }
-            
-            Button {
-                text: "Button 2"
-                width: parent.width - 10  // Dynamically adjust width
-                font.pixelSize: 12
-                padding: 10
-                anchors.horizontalCenter: parent.horizontalCenter
-                background: Rectangle {
-                    color: parent.down ? "#d0d0d0" : "#f0f0f0"
-                    radius: 4
-                }
-            }
         }
     }
 

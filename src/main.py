@@ -10,7 +10,8 @@ from models.spreadsheet_model import SpreadsheetModel
 
 def main():
     # Set the QT_QUICK_CONTROLS_STYLE environment variable
-    os.environ["QT_QUICK_CONTROLS_STYLE"] = "Material"
+    # os.environ["QT_QUICK_CONTROLS_STYLE"] = "Material"
+    os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"  # Set the style to Fusion
 
     app = QGuiApplication(sys.argv)
     model = SpreadsheetModel()
