@@ -10,7 +10,6 @@ ApplicationWindow {
     title: "TextField with Dropdown"
 
     property var recommendations: ["Apple", "Banana", "Cherry", "Date", "Elderberry"]
-    property bool showDropdown: false
 
     ColumnLayout {
         anchors.centerIn: parent
@@ -45,7 +44,17 @@ ApplicationWindow {
                     radius: 5
                 }
 
-                onActiveFocusChanged: showDropdown = activeFocus
+                onActiveFocusChanged: {
+                    if (activeFocus) {
+                        dropdown.open();
+                    } else {
+                        dropdown.close();
+                    }
+                }
+
+                onPressed: {
+                    dropdown.open();
+                }
             }
 
             // Clear button
@@ -87,7 +96,7 @@ ApplicationWindow {
             width: inputField.width
             height: 150
             padding: 0
-            visible: showDropdown
+            closePolicy: Popup.CloseOnEscape  // Only close when pressing Escape
 
             background: Rectangle {
                 color: "#ffffff"
