@@ -186,12 +186,12 @@ Window {
                 const inInput = mouse.globalX >= inputLeft && mouse.globalX <= inputRight &&
                                 mouse.globalY >= inputTop && mouse.globalY <= inputBottom
 
-                // Block clicks outside both areas
+                // Close dropdown when clicking outside both areas
                 if (!inPopup && !inInput) {
-                    mouse.accepted = true
                     dropdown.close()  // Close the dropdown
                     inputField.forceActiveFocus()  // Maintain input focus
                     console.log("Mouse click outside both areas, closing dropdown")
+                    // Removed mouse.accepted = true to allow event propagation
                 }
             }
         }
