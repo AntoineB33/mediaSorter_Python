@@ -11,6 +11,41 @@ ApplicationWindow {
 
     property var recommendations: ["Apple", "Banana", "Cherry", "Date", "Elderberry"]
 
+    MouseArea {
+        anchors.fill: parent
+        enabled: dropdown.opened
+        onPressed: (mouse) => {
+            console.log("Mouse pressed at:", mouse.x, mouse.y)
+            // Check Popup bounds using global coordinates
+            const popupLeft = dropdown.x
+            const popupRight = dropdown.x + dropdown.width
+            const popupTop = dropdown.y
+            const popupBottom = dropdown.y + dropdown.height
+            
+            // Check input field bounds using mapped coordinates
+            const inputGlobal = inputField.mapToGlobal(0, 0)
+            const inputLeft = inputGlobal.x
+            const inputRight = inputLeft + inputField.width
+            const inputTop = inputGlobal.y
+            const inputBottom = inputTop + inputField.height
+            
+            // Test mouse position against both areas
+            const inPopup = mouse.globalX >= popupLeft && mouse.globalX <= popupRight &&
+                            mouse.globalY >= popupTop && mouse.globalY <= popupBottom
+            
+            const inInput = mouse.globalX >= inputLeft && mouse.globalX <= inputRight &&
+                            mouse.globalY >= inputTop && mouse.globalY <= inputBottom
+
+            // Block clicks outside both areas
+            if (!inPopup && !inInput) {
+                mouse.accepted = true
+                dropdown.close()  // Close the dropdown
+                inputField.forceActiveFocus()  // Maintain input focus
+                console.log("Mouse click outside both areas, closing dropdown")
+            }
+        }
+    }
+
     ColumnLayout {
         anchors.centerIn: parent
         spacing: 20
@@ -25,7 +60,7 @@ ApplicationWindow {
                 placeholderText: "Type something..."
                 font.pixelSize: 16
                 padding: 10
-                rightPadding: 40  // Space for clear button
+                rightPadding: 40
                 color: "#333333"
                 selectionColor: "#2196F3"
 
@@ -46,15 +81,13 @@ ApplicationWindow {
 
                 onActiveFocusChanged: {
                     if (activeFocus) {
-                        dropdown.open();
-                    } else {
-                        dropdown.close();
+                        dropdown.open()
+                    } else if (!dropdown.activeFocus) {
+                        dropdown.close()
                     }
                 }
 
-                onPressed: {
-                    dropdown.open();
-                }
+                onPressed: dropdown.open()
             }
 
             // Clear button
@@ -96,7 +129,7 @@ ApplicationWindow {
             width: inputField.width
             height: 150
             padding: 0
-            closePolicy: Popup.CloseOnEscape  // Only close when pressing Escape
+            closePolicy: Popup.CloseOnEscape
 
             background: Rectangle {
                 color: "#ffffff"
@@ -128,7 +161,10 @@ ApplicationWindow {
                         id: mouseArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: inputField.text = modelData
+                        onClicked: {
+                            inputField.text = modelData
+                            inputField.forceActiveFocus()
+                        }
                     }
                 }
 
