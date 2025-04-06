@@ -4,6 +4,7 @@ from pathlib import Path
 from PySide6.QtCore import QAbstractTableModel, Qt, QUrl, QModelIndex, Slot, Property
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
+from .generate_sortings import find_valid_sortings
 
 class SpreadsheetModel(QAbstractTableModel):
     def __init__(self, parent=None):
@@ -177,3 +178,12 @@ class SpreadsheetModel(QAbstractTableModel):
             pass
         except Exception as e:
             print(f"Error loading spreadsheet: {str(e)}")
+
+    @Slot()
+    def findSortings(self):
+        """Call find_valid_sortings with the current spreadsheet data."""
+        try:
+            solutions = find_valid_sortings(self._data)
+            print(f"Found solutions: {solutions}")
+        except Exception as e:
+            print(f"Error finding sortings: {str(e)}")

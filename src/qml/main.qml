@@ -139,6 +139,8 @@ Window {
         }
     }
 
+    
+
     Rectangle {
         id: floatingWindow
         width: 300
@@ -148,15 +150,50 @@ Window {
         y: tableView.y + 10
         z: 1
 
-
+        // Drag handling
         MouseArea {
             anchors.fill: parent
             drag.target: floatingWindow
             drag.axis: Drag.XAndYAxis
             drag.minimumX: tableView.x
-            drag.maximumX: tableView.x + tableView.width - verticalScrollbar.width - floatingWindow.width
+            drag.maximumX: tableView.x + tableView.width - floatingWindow.width
             drag.minimumY: tableView.y
-            drag.maximumY: tableView.y + tableView.height - horizontalScrollbar.height - floatingWindow.height
+            drag.maximumY: tableView.y + tableView.height - floatingWindow.height
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            enabled: dropdown.opened
+            onPressed: (mouse) => {
+                console.log("Mouse pressed at:", mouse.x, mouse.y)
+                // Check Popup bounds using global coordinates
+                const popupLeft = dropdown.x
+                const popupRight = dropdown.x + dropdown.width
+                const popupTop = dropdown.y
+                const popupBottom = dropdown.y + dropdown.height
+                
+                // Check input field bounds using mapped coordinates
+                const inputGlobal = inputField.mapToGlobal(0, 0)
+                const inputLeft = inputGlobal.x
+                const inputRight = inputLeft + inputField.width
+                const inputTop = inputGlobal.y
+                const inputBottom = inputTop + inputField.height
+                
+                // Test mouse position against both areas
+                const inPopup = mouse.globalX >= popupLeft && mouse.globalX <= popupRight &&
+                                mouse.globalY >= popupTop && mouse.globalY <= popupBottom
+                
+                const inInput = mouse.globalX >= inputLeft && mouse.globalX <= inputRight &&
+                                mouse.globalY >= inputTop && mouse.globalY <= inputBottom
+
+                // Block clicks outside both areas
+                if (!inPopup && !inInput) {
+                    mouse.accepted = true
+                    dropdown.close()  // Close the dropdown
+                    inputField.forceActiveFocus()  // Maintain input focus
+                    console.log("Mouse click outside both areas, closing dropdown")
+                }
+            }
         }
 
         ColumnLayout {
@@ -173,7 +210,7 @@ Window {
                     placeholderText: "Type something..."
                     font.pixelSize: 16
                     padding: 10
-                    rightPadding: 60  // Space for both buttons
+                    rightPadding: 40
                     color: "#333333"
                     selectionColor: "#2196F3"
 
@@ -192,17 +229,22 @@ Window {
                         radius: 5
                     }
 
-                    onTextChanged: {
-                        // Add your recommendation filtering logic here
-                        dropdown.visible = text.length > 0
+                    onActiveFocusChanged: {
+                        if (activeFocus) {
+                            dropdown.open()
+                        } else if (!dropdown.activeFocus) {
+                            dropdown.close()
+                        }
                     }
+
+                    onPressed: dropdown.open()
                 }
 
                 // Clear button
                 Rectangle {
                     id: clearButton
                     anchors {
-                        right: dropdownButton.left
+                        right: parent.right
                         verticalCenter: parent.verticalCenter
                         margins: 10
                     }
@@ -221,39 +263,7 @@ Window {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            inputField.text = ""
-                            dropdown.visible = false
-                        }
-                        hoverEnabled: true
-                        onEntered: parent.color = "#f0f0f0"
-                        onExited: parent.color = "transparent"
-                    }
-                }
-
-                // Dropdown button
-                Rectangle {
-                    id: dropdownButton
-                    anchors {
-                        right: parent.right
-                        verticalCenter: parent.verticalCenter
-                        margins: 10
-                    }
-                    width: 20
-                    height: 20
-                    color: "transparent"
-
-                    Text {
-                        text: "▼"
-                        anchors.centerIn: parent
-                        font.pixelSize: 12
-                        color: "#666"
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: dropdown.visible = !dropdown.visible
+                        onClicked: inputField.text = ""
                         hoverEnabled: true
                         onEntered: parent.color = "#f0f0f0"
                         onExited: parent.color = "transparent"
@@ -264,12 +274,12 @@ Window {
             // Dropdown list using Popup
             Popup {
                 id: dropdown
-                y: inputField.height + 5  // Position below the TextField
+                y: inputField.height + 5
                 x: inputField.x
                 width: inputField.width
                 height: 150
                 padding: 0
-                visible: false
+                closePolicy: Popup.CloseOnEscape
 
                 background: Rectangle {
                     color: "#ffffff"
@@ -303,7 +313,7 @@ Window {
                             hoverEnabled: true
                             onClicked: {
                                 inputField.text = modelData
-                                dropdown.visible = false
+                                inputField.forceActiveFocus()
                             }
                         }
                     }
@@ -314,14 +324,14 @@ Window {
                 }
             }
 
-            // Add two buttons below the existing layout
+            // Buttons
             RowLayout {
                 spacing: 10
                 Layout.alignment: Qt.AlignHCenter
 
                 Button {
                     text: "Button 1"
-                    onClicked: console.log("Button 1 clicked")
+                    onClicked: spreadsheetModel.findSortings()
                 }
 
                 Button {
