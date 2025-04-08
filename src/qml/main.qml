@@ -200,6 +200,21 @@ Window {
             anchors.centerIn: parent
             spacing: 20
 
+            RowLayout {
+                spacing: 10
+                Layout.alignment: Qt.AlignHCenter
+
+                Button {
+                    text: "Rename"
+                    onClicked: console.log("Rename button clicked")
+                }
+
+                Button {
+                    text: "Create"
+                    onClicked: console.log("Create button clicked")
+                }
+            }
+
             Item {
                 Layout.preferredWidth: 200
                 Layout.preferredHeight: 40
@@ -269,57 +284,57 @@ Window {
                         onExited: parent.color = "transparent"
                     }
                 }
-            }
 
-            // Dropdown list using Popup
-            Popup {
-                id: dropdown
-                y: inputField.height + 5
-                x: inputField.x
-                width: inputField.width
-                height: 150
-                padding: 0
-                closePolicy: Popup.CloseOnEscape
+                // Dropdown list using Popup
+                Popup {
+                    id: dropdown
+                    y: inputField.height + 5
+                    x: inputField.x
+                    width: inputField.width
+                    height: 150
+                    padding: 0
+                    closePolicy: Popup.CloseOnEscape
 
-                background: Rectangle {
-                    color: "#ffffff"
-                    border.color: "#cccccc"
-                    radius: 5
-                }
-
-                contentItem: ListView {
-                    id: listView
-                    anchors.fill: parent
-                    anchors.margins: 5
-                    clip: true
-                    model: recommendations
-
-                    delegate: Rectangle {
-                        width: listView.width
-                        height: 30
-                        color: mouseArea.containsMouse ? "#f0f0f0" : "transparent"
-
-                        Text {
-                            text: modelData
-                            anchors.verticalCenter: parent.verticalCenter
-                            leftPadding: 10
-                            font.pixelSize: 14
-                            color: "#333333"
-                        }
-
-                        MouseArea {
-                            id: mouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: {
-                                inputField.text = modelData
-                                inputField.forceActiveFocus()
-                            }
-                        }
+                    background: Rectangle {
+                        color: "#ffffff"
+                        border.color: "#cccccc"
+                        radius: 5
                     }
 
-                    ScrollBar.vertical: ScrollBar {
-                        policy: ScrollBar.AsNeeded
+                    contentItem: ListView {
+                        id: listView
+                        anchors.fill: parent
+                        anchors.margins: 5
+                        clip: true
+                        model: recommendations
+
+                        delegate: Rectangle {
+                            width: listView.width
+                            height: 30
+                            color: mouseArea.containsMouse ? "#f0f0f0" : "transparent"
+
+                            Text {
+                                text: modelData
+                                anchors.verticalCenter: parent.verticalCenter
+                                leftPadding: 10
+                                font.pixelSize: 14
+                                color: "#333333"
+                            }
+
+                            MouseArea {
+                                id: mouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: {
+                                    inputField.text = modelData
+                                    inputField.forceActiveFocus()
+                                }
+                            }
+                        }
+
+                        ScrollBar.vertical: ScrollBar {
+                            policy: ScrollBar.AsNeeded
+                        }
                     }
                 }
             }

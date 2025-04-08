@@ -17,7 +17,7 @@ Thumbs.db
 
 # IDE-specific files
 .idea/
-.vscode/
+# .vscode/
 *.iml
 
 # Virtual environments
