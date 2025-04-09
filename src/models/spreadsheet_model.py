@@ -12,42 +12,53 @@ class SpreadsheetModel(QAbstractTableModel):
         self._data = []
         self._rows_nb = 0
         self._columns_nb = 0
-        self.collectionName = "collection_1"
+        self._collectionName = "collection_1"
         self._maxRow = 0
         self._maxColumn = 0
         self._collection = {"maxRow": self._maxRow, "maxColumn": self._maxColumn, "data": self._data}
-        self._collections = {"data": {self.collectionName: self._collection}, "collectionName": self.collectionName}
+        self._collections = {"collections": {self._collectionName: self._collection}, "collectionName": self._collectionName}
         self.load_from_file()
+    
+    @Slot(result=str)
+    def getCollectionName(self):
+        """Return the current collection name."""
+        return self._collectionName
 
     @Slot(result=str)
     def getDefaultSpreadsheetName(self):
         """Generate a default spreadsheet name not already used."""
-        existing_names = self.getSpreadsheetNames()
         i = 1
-        while f"Default_{i}" in existing_names:
+        while f"Default_{i}" in self._collections["collections"]:
             i += 1
         return f"Default_{i}"
-
-    @Slot(result=list)
-    def getSpreadsheetNames(self):
-        """Return a list of saved spreadsheet names."""
-        try:
-            return [f.stem for f in Path("data/spreadsheets").glob("*.json")]
-        except Exception as e:
-            print(f"Error fetching spreadsheet names: {str(e)}")
-            return []
 
     @Slot(str)
     def setSpreadsheetName(self, name):
         """Set the current spreadsheet name."""
-        self.collectionName = name
+        self._collectionName = name
         self.save_to_file()
 
     @Slot(str)
+    def pressEnterOnInput(self, name):
+        """Handle Enter key press on input field."""
+        if not self.loadSpreadsheet(name):
+            
+
+    @Slot(str, result=bool)
     def loadSpreadsheet(self, name):
         """Load a spreadsheet by name."""
-        self.collectionName = name
-        self.load_from_file(f"data/spreadsheets/{name}.json")
+        collection = self._collections["collections"].get(name, {})
+        if collection:
+            self._collectionName = name
+            self._collection = collection
+            self._data = self._collection["data"]
+            self._maxRow = self._collection["maxRow"]
+            self._maxColumn = self._collection["maxColumn"]
+            self.beginResetModel()
+            self.endResetModel()
+            return True
+        else:
+            return False
 
     def rowCount(self, parent=None):
         return self._rows_nb
@@ -144,14 +155,28 @@ class SpreadsheetModel(QAbstractTableModel):
         return {Qt.DisplayRole: b"display"}
 
     @Slot(result=list)
-    def getExistingCollectionNames(self):
-        """Return a list of existing collection names."""
-        return list(self._collections["data"].keys())
+    def getOtherCollectionNames(self):
+        """Return a list of other collection names."""
+        return [name for name in self._collections["collections"].keys() if name != self._collectionName]
+    
+    @Slot(str)
+    def setCollectionName(self, name):
+        """Set the current collection name."""
+        if name not in self._collections["collections"]:
+            self._collections["collections"][name] = {
+                "maxRow": self._maxRow,
+                "maxColumn": self._maxColumn,
+                "data": self._data
+            }
+            self._collectionName = name
+            self.save_to_file()
+        else:
+            print(f"Collection '{name}' already exists.")
     
     def save_to_file(self, filename=None):
         """Save model data to a JSON file."""
         if not filename:
-            filename = f"data/spreadsheets/{self.collectionName}.json"
+            filename = f"data/spreadsheets/{self._collectionName}.json"
         Path("data/spreadsheets").mkdir(parents=True, exist_ok=True)
         with open(filename, 'w') as f:
             json.dump(self._collections, f)
@@ -159,7 +184,7 @@ class SpreadsheetModel(QAbstractTableModel):
     def load_from_file(self, filename=None):
         """Load model data from a JSON file."""
         if not filename:
-            filename = f"data/spreadsheets/{self.collectionName}.json"
+            filename = f"data/spreadsheets/{self._collectionName}.json"
         try:
             with open(filename, 'r') as f:
                 collections = json.load(f)
@@ -168,7 +193,7 @@ class SpreadsheetModel(QAbstractTableModel):
                 self.beginResetModel()
                 self._collections = collections
                 self._collectionName = self._collections["collectionName"]
-                self._collection = self._collections["data"][self._collectionName]
+                self._collection = self._collections["collections"][self._collectionName]
                 self._data = self._collection["data"]
                 self._maxRow = self._collection["maxRow"]
                 self._maxColumn = self._collection["maxColumn"]

@@ -4,11 +4,12 @@ import QtQuick.Layouts
 import "./components" as Components
 
 Window {
+    id: mainWindow
     width: 800
     height: 600
     visible: true
     title: "Dynamic Spreadsheet"
-    property var recommendations: ["Apple", "Banana", "Cherry", "Date", "Elderberry"]
+    property var recommendations: []
 
     RowLayout {
         anchors.fill: parent
@@ -191,6 +192,7 @@ Window {
                     dropdown.close()  // Close the dropdown
                     inputField.forceActiveFocus()  // Maintain input focus
                     console.log("Mouse click outside both areas, closing dropdown")
+                    inputField.text = spreadsheetModel.getCollectionName()
                     // Removed mouse.accepted = true to allow event propagation
                 }
             }
@@ -206,12 +208,12 @@ Window {
 
                 Button {
                     text: "Rename"
-                    onClicked: console.log("Rename button clicked")
+                    onClicked: spreadsheetModel.setCollectionName(inputField.text)
                 }
 
                 Button {
                     text: "Create"
-                    onClicked: console.log("Create button clicked")
+                    onClicked: spreadsheetModel.newCollection(inputField.text)
                 }
             }
 
@@ -253,6 +255,11 @@ Window {
                     }
 
                     onPressed: dropdown.open()
+
+                    onAccepted: {
+                        spreadsheetModel.pressEnterOnInput(inputField.text)
+                        dropdown.close();
+                    }
                 }
 
                 // Clear button
@@ -295,6 +302,13 @@ Window {
                     padding: 0
                     closePolicy: Popup.CloseOnEscape
 
+                    onOpened: {
+                        // Fetch collection names from the backend and update recommendations
+                        var names = spreadsheetModel.getOtherCollectionNames();
+                        mainWindow.recommendations = names;
+                        inputField.text = spreadsheetModel.getCollectionName();
+                    }
+
                     background: Rectangle {
                         color: "#ffffff"
                         border.color: "#cccccc"
@@ -306,7 +320,7 @@ Window {
                         anchors.fill: parent
                         anchors.margins: 5
                         clip: true
-                        model: recommendations
+                        model: mainWindow.recommendations
 
                         delegate: Rectangle {
                             width: listView.width
@@ -328,6 +342,7 @@ Window {
                                 onClicked: {
                                     inputField.text = modelData
                                     inputField.forceActiveFocus()
+                                    spreadsheetModel.loadSpreadsheet(modelData)
                                 }
                             }
                         }
