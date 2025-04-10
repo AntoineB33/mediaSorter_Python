@@ -230,6 +230,7 @@ Window {
                     rightPadding: 40
                     color: "#333333"
                     selectionColor: "#2196F3"
+                    text: spreadsheetModel.input_text  // Read from model
 
                     cursorDelegate: Rectangle {
                         visible: inputField.cursorVisible
@@ -340,9 +341,9 @@ Window {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 onClicked: {
-                                    inputField.text = modelData
-                                    inputField.forceActiveFocus()
-                                    spreadsheetModel.loadSpreadsheet(modelData)
+                                    inputField.text = modelData;
+                                    inputField.forceActiveFocus();
+                                    spreadsheetModel.loadSpreadsheet(modelData);
                                 }
                             }
                         }

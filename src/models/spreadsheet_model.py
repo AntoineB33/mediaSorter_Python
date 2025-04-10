@@ -1,12 +1,15 @@
 import sys
 import json
 from pathlib import Path
-from PySide6.QtCore import QAbstractTableModel, Qt, QUrl, QModelIndex, Slot, Property
+from PySide6.QtCore import QAbstractTableModel, Qt, QUrl, QModelIndex, Slot, Property, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from .generate_sortings import find_valid_sortings
 
 class SpreadsheetModel(QAbstractTableModel):
+
+    input_text_changed = Signal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._data = []
@@ -35,6 +38,8 @@ class SpreadsheetModel(QAbstractTableModel):
     @Slot(str)
     def setSpreadsheetName(self, name):
         """Set the current spreadsheet name."""
+        self._collections["collections"][name] = self._collection
+        del self._collections["collections"][self._collectionName]
         self._collectionName = name
         self.save_to_file()
 
@@ -42,7 +47,7 @@ class SpreadsheetModel(QAbstractTableModel):
     def pressEnterOnInput(self, name):
         """Handle Enter key press on input field."""
         if not self.loadSpreadsheet(name):
-            
+            self.setSpreadsheetName(name)
 
     @Slot(str, result=bool)
     def loadSpreadsheet(self, name):
@@ -54,6 +59,8 @@ class SpreadsheetModel(QAbstractTableModel):
             self._data = self._collection["data"]
             self._maxRow = self._collection["maxRow"]
             self._maxColumn = self._collection["maxColumn"]
+            self.input_text_changed.emit("hey")
+            self.save_to_file()
             self.beginResetModel()
             self.endResetModel()
             return True
@@ -212,3 +219,11 @@ class SpreadsheetModel(QAbstractTableModel):
             print(f"Found solutions: {solutions}")
         except Exception as e:
             print(f"Error finding sortings: {str(e)}")
+
+    # Expose as a Qt Property
+    input_text = Property(
+        str,
+        lambda : "hey",
+        lambda : "e",
+        notify=input_text_changed  # Link to signal
+    )
