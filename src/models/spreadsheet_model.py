@@ -41,7 +41,6 @@ class SpreadsheetModel(QAbstractTableModel):
             pass
         except Exception as e:
             print(f"Error loading spreadsheet: {str(e)}")
-        self.input_text_changed.emit(self._collectionName)
     
     @Slot(result=str)
     def getCollectionName(self):
