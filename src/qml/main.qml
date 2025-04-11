@@ -191,7 +191,6 @@ Window {
                 if (!inPopup && !inInput) {
                     dropdown.close()  // Close the dropdown
                     inputField.forceActiveFocus()  // Maintain input focus
-                    console.log("Mouse click outside both areas, closing dropdown")
                     inputField.text = spreadsheetModel.getCollectionName()
                     // Removed mouse.accepted = true to allow event propagation
                 }
@@ -213,7 +212,12 @@ Window {
 
                 Button {
                     text: "Create"
-                    onClicked: spreadsheetModel.newCollection(inputField.text)
+                    onClicked: spreadsheetModel.createCollection(inputField.text)
+                }
+
+                Button {
+                    text: "Remove"
+                    onClicked: spreadsheetModel.removeCollection(inputField.text)
                 }
             }
 
@@ -307,7 +311,6 @@ Window {
                         // Fetch collection names from the backend and update recommendations
                         var names = spreadsheetModel.getOtherCollectionNames();
                         mainWindow.recommendations = names;
-                        inputField.text = spreadsheetModel.getCollectionName();
                     }
 
                     background: Rectangle {
@@ -347,7 +350,6 @@ Window {
                                 }
                             }
                         }
-
                         ScrollBar.vertical: ScrollBar {
                             policy: ScrollBar.AsNeeded
                         }
@@ -367,7 +369,6 @@ Window {
 
                 Button {
                     text: "Button 2"
-                    onClicked: console.log("Button 2 clicked")
                 }
             }
         }

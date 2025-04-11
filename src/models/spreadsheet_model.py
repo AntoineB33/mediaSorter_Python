@@ -15,12 +15,33 @@ class SpreadsheetModel(QAbstractTableModel):
         self._data = []
         self._rows_nb = 0
         self._columns_nb = 0
-        self._collectionName = "collection_1"
+        self._collections = {
+            "collections": {},
+        }
+        self._collectionName = self.getDefaultSpreadsheetName()
         self._maxRow = 0
         self._maxColumn = 0
-        self._collection = {"maxRow": self._maxRow, "maxColumn": self._maxColumn, "data": self._data}
-        self._collections = {"collections": {self._collectionName: self._collection}, "collectionName": self._collectionName}
-        self.load_from_file()
+        self._collection = {"maxRow": 0, "maxColumn": 0, "data": []}
+        self._collections = {
+            "collections": {self._collectionName: self._collection},
+            "collectionName": self._collectionName
+        }
+        try:
+            with open(f"data/general.json", 'r') as f:
+                collections = json.load(f)
+            if collections:
+                self._collections = collections
+                self._collectionName = collections["collectionName"]
+                self._collection = collections["collections"].get(self._collectionName, {})
+                self._maxRow = self._collection["maxRow"]
+                self._maxColumn = self._collection["maxColumn"]
+                self._data = self._collection["data"]
+        except FileNotFoundError:
+            # No saved data, initialize with defaults if needed
+            pass
+        except Exception as e:
+            print(f"Error loading spreadsheet: {str(e)}")
+        self.input_text_changed.emit(self._collectionName)
     
     @Slot(result=str)
     def getCollectionName(self):
@@ -38,33 +59,77 @@ class SpreadsheetModel(QAbstractTableModel):
     @Slot(str)
     def setSpreadsheetName(self, name):
         """Set the current spreadsheet name."""
+        if name in self._collections["collections"]:
+            return
+        self.beginResetModel()
         self._collections["collections"][name] = self._collection
         del self._collections["collections"][self._collectionName]
         self._collectionName = name
+        self.endResetModel()
         self.save_to_file()
+    
+    @Slot(str)
+    def createCollection(self, name):
+        """Create a new collection with the given name."""
+        if name in self._collections["collections"]:
+            name = self.getDefaultSpreadsheetName()
+            self.input_text_changed.emit(name)
+        self._collections["collections"][name] = {
+            "data": [],
+            "maxRow": 0,
+            "maxColumn": 0,
+        }
+        self._collection = self._collections["collections"][name]
+        self._data = self._collection["data"]
+        self._maxRow = 0
+        self._maxColumn = 0
+        self._collectionName = name
+        self.save_to_file()
+    
+    @Slot(str)
+    def removeCollection(self, name):
+        """Remove a collection by name."""
+        if name in self._collections["collections"]:
+            self.beginResetModel()
+            del self._collections["collections"][name]
+            if not self._collections["collections"]:
+                self._collections["collections"] = {self.getDefaultSpreadsheetName(): {
+                    "maxRow": 0,
+                    "maxColumn": 0,
+                    "data": []
+                }}
+            self._collectionName = self._collections["collections"].keys()[0]
+            self._collection = self._collections["collections"][self._collectionName]
+            self._data = self._collection["data"]
+            self._maxRow = self._collection["maxRow"]
+            self._maxColumn = self._collection["maxColumn"]
+            self.endResetModel()
+            self.input_text_changed.emit(self._collectionName)
+            self.save_to_file()
+
 
     @Slot(str)
     def pressEnterOnInput(self, name):
         """Handle Enter key press on input field."""
         if not self.loadSpreadsheet(name):
-            self.setSpreadsheetName(name)
+            self.createCollection(name)
 
     @Slot(str, result=bool)
     def loadSpreadsheet(self, name):
         """Load a spreadsheet by name."""
         collection = self._collections["collections"].get(name, {})
         if collection:
+            self.beginResetModel()
             self._collectionName = name
             self._collection = collection
             self._data = self._collection["data"]
             self._maxRow = self._collection["maxRow"]
             self._maxColumn = self._collection["maxColumn"]
-            self.input_text_changed.emit("hey")
-            self.save_to_file()
-            self.beginResetModel()
             self.endResetModel()
+            self.save_to_file()
             return True
         else:
+            self.input_text_changed.emit(self._collectionName)
             return False
 
     def rowCount(self, parent=None):
@@ -180,36 +245,10 @@ class SpreadsheetModel(QAbstractTableModel):
         else:
             print(f"Collection '{name}' already exists.")
     
-    def save_to_file(self, filename=None):
+    def save_to_file(self):
         """Save model data to a JSON file."""
-        if not filename:
-            filename = f"data/spreadsheets/{self._collectionName}.json"
-        Path("data/spreadsheets").mkdir(parents=True, exist_ok=True)
-        with open(filename, 'w') as f:
+        with open(f"data/general.json", 'w') as f:
             json.dump(self._collections, f)
-
-    def load_from_file(self, filename=None):
-        """Load model data from a JSON file."""
-        if not filename:
-            filename = f"data/spreadsheets/{self._collectionName}.json"
-        try:
-            with open(filename, 'r') as f:
-                collections = json.load(f)
-            
-            if collections:
-                self.beginResetModel()
-                self._collections = collections
-                self._collectionName = self._collections["collectionName"]
-                self._collection = self._collections["collections"][self._collectionName]
-                self._data = self._collection["data"]
-                self._maxRow = self._collection["maxRow"]
-                self._maxColumn = self._collection["maxColumn"]
-                self.endResetModel()
-        except FileNotFoundError:
-            # No saved data, initialize with defaults if needed
-            pass
-        except Exception as e:
-            print(f"Error loading spreadsheet: {str(e)}")
 
     @Slot()
     def findSortings(self):
@@ -219,11 +258,3 @@ class SpreadsheetModel(QAbstractTableModel):
             print(f"Found solutions: {solutions}")
         except Exception as e:
             print(f"Error finding sortings: {str(e)}")
-
-    # Expose as a Qt Property
-    input_text = Property(
-        str,
-        lambda : "hey",
-        lambda : "e",
-        notify=input_text_changed  # Link to signal
-    )
