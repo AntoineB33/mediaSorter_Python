@@ -216,8 +216,8 @@ Window {
                 }
 
                 Button {
-                    text: "Remove"
-                    onClicked: spreadsheetModel.removeCollection(inputField.text)
+                    text: "Delete"
+                    onClicked: spreadsheetModel.deleteCollection(inputField.text)
                 }
             }
 
@@ -234,7 +234,7 @@ Window {
                     rightPadding: 40
                     color: "#333333"
                     selectionColor: "#2196F3"
-                    text: spreadsheetModel.input_text  // Read from model
+                    text: spreadsheetModel.input_text
 
                     cursorDelegate: Rectangle {
                         visible: inputField.cursorVisible
@@ -264,6 +264,10 @@ Window {
                     onAccepted: {
                         spreadsheetModel.pressEnterOnInput(inputField.text)
                         dropdown.close();
+                    }
+
+                    onTextChanged: {
+                        mainWindow.recommendations = spreadsheetModel.getOtherCollectionNames(inputField.text)
                     }
                 }
 
@@ -309,7 +313,9 @@ Window {
 
                     onOpened: {
                         // Fetch collection names from the backend and update recommendations
-                        var names = spreadsheetModel.getOtherCollectionNames();
+                        var names = spreadsheetModel.getOtherCollectionNames(
+                            inputField.text
+                        );
                         mainWindow.recommendations = names;
                     }
 
