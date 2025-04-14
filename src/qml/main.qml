@@ -304,6 +304,7 @@ Window {
                 // Dropdown list using Popup
                 Popup {
                     id: dropdown
+                    // property TextField inputFieldRef: inputField
                     y: inputField.height + 5
                     x: inputField.x
                     width: inputField.width
@@ -350,9 +351,13 @@ Window {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 onClicked: {
+                                    console.log("\n\nhello\n\n")
                                     inputField.text = modelData;
+                                    console.log("\n\nyo\n\n")
                                     inputField.forceActiveFocus();
+                                    console.log("\n\nworld\n\n")
                                     spreadsheetModel.loadSpreadsheet(modelData);
+                                    console.log("\n\nhey\n\n")
                                 }
                             }
                         }
@@ -369,8 +374,8 @@ Window {
                 Layout.alignment: Qt.AlignHCenter
 
                 Button {
-                    text: "Button 1"
-                    onClicked: spreadsheetModel.findSortings()
+                    text: "Sort"
+                    // onClicked: spreadsheetModel.findSortings()
                 }
 
                 Button {
