@@ -38,7 +38,7 @@ ApplicationWindow {
         onTextChanged: updateSuggestions()
 
         // Handle key presses for navigation
-        Keys.onPressed: {
+        Keys.onPressed: function(event) {
             if (event.key === Qt.Key_Down && suggestionsPopup.opened) {
                 suggestionsList.currentIndex = 0
                 suggestionsList.forceActiveFocus()
@@ -77,7 +77,7 @@ ApplicationWindow {
             }
 
             // Handle selection via keyboard (Enter or Return key)
-            Keys.onPressed: {
+            Keys.onPressed: function(event) {
                 if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
                     if (currentIndex >= 0) {
                         inputField.text = model[currentIndex]
