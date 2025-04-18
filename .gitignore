@@ -1,6 +1,5 @@
 # User data
 /data/
-*.json
 *.xlsx
 
 # Logs
@@ -17,7 +16,6 @@ Thumbs.db
 
 # IDE-specific files
 .idea/
-# .vscode/
 *.iml
 
 # Virtual environments

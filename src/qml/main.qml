@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "./components" as Components
 
 Window {
     id: mainWindow
@@ -134,9 +133,6 @@ Window {
                     }
                 }
             }
-
-            // Cell delegate
-            delegate: Components.CellDelegate {}
         }
     }
 
@@ -351,13 +347,9 @@ Window {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 onClicked: {
-                                    console.log("\n\nhello\n\n")
                                     inputField.text = modelData;
-                                    console.log("\n\nyo\n\n")
                                     inputField.forceActiveFocus();
-                                    console.log("\n\nworld\n\n")
                                     spreadsheetModel.loadSpreadsheet(modelData);
-                                    console.log("\n\nhey\n\n")
                                 }
                             }
                         }

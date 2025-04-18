@@ -35,6 +35,7 @@ class SpreadsheetModel(QAbstractTableModel):
             "collectionName": self._collectionName,
         }
         try:
+            Path("data").mkdir(parents=True, exist_ok=True)
             with open(f"data/general.json", "r") as f:
                 collections = json.load(f)
             if collections:
