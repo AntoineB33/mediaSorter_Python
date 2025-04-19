@@ -150,6 +150,7 @@ class SpreadsheetModel(QAbstractTableModel):
             self.input_text_changed.emit(self._collectionName)
             return False
 
+    @Property(int, constant=True)
     def rowCount(self, parent=None):
         return self._rows_nb
 
