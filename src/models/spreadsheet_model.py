@@ -87,23 +87,23 @@ class SpreadsheetModel(QAbstractTableModel):
     @Slot(str)
     def createCollection(self, name):
         """Create a new collection with the given name."""
-        if name in self._collections["collections"]:
+        self.beginResetModel()
+        if new_collection := (name in self._collections["collections"]):
             name = self.getDefaultSpreadsheetName()
-            self._collectionName = name
-            self.input_text_changed.emit()
         self._collections["collections"][name] = {
             "data": [],
             "maxRow": 0,
             "maxColumn": 0,
         }
-        self.beginResetModel()
         self._collectionName = name
         self._collection = self._collections["collections"][name]
         self._data = self._collection["data"]
-        self._maxRow = 0
-        self._maxColumn = 0
+        self._maxRow = self._collection["maxRow"]
+        self._maxColumn = self._collection["maxColumn"]
         self.endResetModel()
-        self.save_to_file()
+        self.input_text_changed.emit()
+        if new_collection:
+            self.save_to_file()
 
     @Slot(str)
     def deleteCollection(self, name):
@@ -159,7 +159,7 @@ class SpreadsheetModel(QAbstractTableModel):
         return self._columns_nb
 
     def data(self, index, role=Qt.DisplayRole):
-        if role == Qt.DisplayRole and index.isValid():
+        if role == Qt.DisplayRole and index.isValid() and index.row() < len(self._data) and index.column() < len(self._data[index.row()]):
             return self._data[index.row()][index.column()]
         return None
 
@@ -167,6 +167,7 @@ class SpreadsheetModel(QAbstractTableModel):
         if role == Qt.EditRole and index.isValid():
             row = index.row()
             col = index.column()
+            if row 
             self._data[row][col] = value
             if row >= self._maxRow:
                 self._maxRow = row + 1
@@ -187,8 +188,6 @@ class SpreadsheetModel(QAbstractTableModel):
         new_row_count = self._rows_nb + count
         self.beginInsertRows(QModelIndex(), self._rows_nb, new_row_count - 1)
         self._rows_nb = new_row_count
-        for _ in range(count):
-            self._data.append([""] * self._columns_nb)
         self.endInsertRows()
 
     @Slot(int)
