@@ -4,6 +4,8 @@ import QtQuick.Layouts
 
 Rectangle {
     id: floatingWindow
+    property var tableView
+    property var recommendations: []
     width: 300
     height: 200
     color: "lightblue"
@@ -11,10 +13,6 @@ Rectangle {
     y: tableView.y + 10
     z: 1
 
-    required property var tableView
-    required property var model
-    property var recommendations: []
-    
     // Drag handling
     MouseArea {
         anchors.fill: parent
@@ -129,9 +127,8 @@ Rectangle {
                     spreadsheetModel.pressEnterOnInput(inputField.text)
                     dropdown.close();
                 }
-
                 onTextChanged: {
-                    mainWindow.recommendations = spreadsheetModel.getOtherCollectionNames(inputField.text)
+                    recommendations = spreadsheetModel.getOtherCollectionNames(inputField.text)
                 }
             }
 
@@ -177,11 +174,10 @@ Rectangle {
                 closePolicy: Popup.CloseOnEscape
 
                 onOpened: {
-                    // Fetch collection names from the backend and update recommendations
-                    var names = spreadsheetModel.getOtherCollectionNames(
+                    recommendations = spreadsheetModel.getOtherCollectionNames(
                         inputField.text
                     );
-                    mainWindow.recommendations = names;
+                    console.log("onOpened: ", recommendations)
                 }
 
                 background: Rectangle {
@@ -195,9 +191,9 @@ Rectangle {
                     anchors.fill: parent
                     anchors.margins: 5
                     clip: true
-                    model: mainWindow.recommendations
+                    model: recommendations
 
-                    delegate: Rectangle {
+                    delegate: Rectangle {   
                         width: listView.width
                         height: 30
                         color: mouseArea.containsMouse ? "#f0f0f0" : "transparent"
@@ -215,13 +211,9 @@ Rectangle {
                             anchors.fill: parent
                             hoverEnabled: true
                             onClicked: {
-                                console.log("\n\nhello\n\n")
-                                inputField.text = modelData;
-                                console.log("\n\nyo\n\n")
                                 inputField.forceActiveFocus();
-                                console.log("\n\nworld\n\n")
                                 spreadsheetModel.loadSpreadsheet(modelData);
-                                console.log("\n\nhey\n\n")
+                                inputField.text = modelData;
                             }
                         }
                     }

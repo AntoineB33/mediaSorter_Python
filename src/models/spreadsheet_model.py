@@ -89,17 +89,20 @@ class SpreadsheetModel(QAbstractTableModel):
         """Create a new collection with the given name."""
         if name in self._collections["collections"]:
             name = self.getDefaultSpreadsheetName()
-            self.input_text_changed.emit(name)
+            self._collectionName = name
+            self.input_text_changed.emit()
         self._collections["collections"][name] = {
             "data": [],
             "maxRow": 0,
             "maxColumn": 0,
         }
+        self.beginResetModel()
+        self._collectionName = name
         self._collection = self._collections["collections"][name]
         self._data = self._collection["data"]
         self._maxRow = 0
         self._maxColumn = 0
-        self._collectionName = name
+        self.endResetModel()
         self.save_to_file()
 
     @Slot(str)
@@ -122,7 +125,7 @@ class SpreadsheetModel(QAbstractTableModel):
             self._maxRow = self._collection["maxRow"]
             self._maxColumn = self._collection["maxColumn"]
             self.endResetModel()
-            self.input_text_changed.emit(self._collectionName)
+            self.input_text_changed.emit()
             self.save_to_file()
 
     @Slot(str)
@@ -146,7 +149,7 @@ class SpreadsheetModel(QAbstractTableModel):
             self.save_to_file()
             return True
         else:
-            self.input_text_changed.emit(self._collectionName)
+            self.input_text_changed.emit()
             return False
 
     def rowCount(self, parent=None):
