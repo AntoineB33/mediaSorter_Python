@@ -53,7 +53,6 @@ class SpreadsheetModel(QAbstractTableModel):
             print(f"Error loading spreadsheet: {str(e)}")
         self.input_text_changed.emit()
     
-    
     @Property(str, notify=input_text_changed)
     def input_text(self):
         """Property for the input text."""
@@ -65,12 +64,12 @@ class SpreadsheetModel(QAbstractTableModel):
         return self._collectionName
 
     @Slot(result=str)
-    def getDefaultSpreadsheetName(self):
+    def getDefaultSpreadsheetName(self, base_name = "Default"):
         """Generate a default spreadsheet name not already used."""
         i = 1
-        while f"Default_{i}" in self._collections["collections"]:
+        while f"{base_name}_{i}" in self._collections["collections"]:
             i += 1
-        return f"Default_{i}"
+        return f"{base_name}_{i}"
 
     @Slot(str)
     def setSpreadsheetName(self, name):
@@ -87,9 +86,12 @@ class SpreadsheetModel(QAbstractTableModel):
     @Slot(str)
     def createCollection(self, name):
         """Create a new collection with the given name."""
+        # self._collectionName = "name"
+        # self.input_text_changed.emit()
+        # return
         self.beginResetModel()
-        if new_collection := (name in self._collections["collections"]):
-            name = self.getDefaultSpreadsheetName()
+        if new_collection_name := (name in self._collections["collections"]):
+            name = self.getDefaultSpreadsheetName(name)
         self._collections["collections"][name] = {
             "data": [],
             "maxRow": 0,
@@ -101,9 +103,9 @@ class SpreadsheetModel(QAbstractTableModel):
         self._maxRow = self._collection["maxRow"]
         self._maxColumn = self._collection["maxColumn"]
         self.endResetModel()
-        self.input_text_changed.emit()
-        if new_collection:
-            self.save_to_file()
+        if new_collection_name:
+            self.input_text_changed.emit()
+        self.save_to_file()
 
     @Slot(str)
     def deleteCollection(self, name):
@@ -159,22 +161,50 @@ class SpreadsheetModel(QAbstractTableModel):
         return self._columns_nb
 
     def data(self, index, role=Qt.DisplayRole):
-        if role == Qt.DisplayRole and index.isValid() and index.row() < len(self._data) and index.column() < len(self._data[index.row()]):
-            return self._data[index.row()][index.column()]
+        if role == Qt.DisplayRole and index.isValid():
+            if index.row() < len(self._data) and index.column() < len(self._data[index.row()]):
+                return self._data[index.row()][index.column()]
+            else:
+                return ""
         return None
 
     def setData(self, index, value, role=Qt.EditRole):
         if role == Qt.EditRole and index.isValid():
             row = index.row()
             col = index.column()
-            if row 
-            self._data[row][col] = value
-            if row >= self._maxRow:
-                self._maxRow = row + 1
-                self._collection["maxRow"] = self._maxRow
-            if col >= self._maxColumn:
-                self._maxColumn = col + 1
-                self._collection["maxColumn"] = self._maxColumn
+            self.beginResetModel()
+            if value:
+                if row >= self._maxRow:
+                    for i in range(row - self._maxRow + 1):
+                        self._data.append([""] * self._maxColumn)
+                    self._maxRow = row + 1
+                    self._collection["maxRow"] = self._maxRow
+                if col >= self._maxColumn:
+                    for aRow in self._data:
+                        aRow.extend([""] * (col - self._maxColumn + 1))
+                    self._maxColumn = col + 1
+                    self._collection["maxColumn"] = self._maxColumn
+                self._data[row][col] = value
+            elif row < self._maxRow and col < self._maxColumn:
+                self._data[row][col] = ""
+                if row == self._maxRow - 1:
+                    for i in range(self._maxRow - 1, -1, -1):
+                        if self._data[i].count("") == self._maxColumn:
+                            self._maxRow -= 1
+                            self._collection["maxRow"] = self._maxRow
+                            self._data.pop(i)
+                        else:
+                            break
+                if col == self._maxColumn - 1:
+                    for i in range(self._maxColumn - 1, -1, -1):
+                        if all(aRow[i] == "" for aRow in self._data):
+                            self._maxColumn -= 1
+                            self._collection["maxColumn"] = self._maxColumn
+                            for aRow in self._data:
+                                aRow.pop(i)
+                        else:
+                            break
+            self.endResetModel()
             # Emit dataChanged for both EditRole and DisplayRole
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
             self.save_to_file()
@@ -197,8 +227,6 @@ class SpreadsheetModel(QAbstractTableModel):
         new_col_count = self._columns_nb + count
         self.beginInsertColumns(QModelIndex(), self._columns_nb, new_col_count - 1)
         self._columns_nb = new_col_count
-        for row in self._data:
-            row.extend([""] * count)
         self.endInsertColumns()
 
     @Slot(int)
@@ -207,13 +235,10 @@ class SpreadsheetModel(QAbstractTableModel):
             return
         if count < self._rows_nb:
             self.beginRemoveRows(QModelIndex(), count, self._rows_nb - 1)
-            self._data = self._data[:count]
             self._rows_nb = count
             self.endRemoveRows()
         elif count > self._rows_nb:
             self.beginInsertRows(QModelIndex(), self._rows_nb, count - 1)
-            for _ in range(count - self._rows_nb):
-                self._data.append([""] * self._columns_nb)
             self._rows_nb = count
             self.endInsertRows()
 
@@ -223,14 +248,10 @@ class SpreadsheetModel(QAbstractTableModel):
             return
         if count < self._columns_nb:
             self.beginRemoveColumns(QModelIndex(), count, self._columns_nb - 1)
-            for row in self._data:
-                row = row[:count]
             self._columns_nb = count
             self.endRemoveColumns()
         elif count > self._columns_nb:
             self.beginInsertColumns(QModelIndex(), self._columns_nb, count - 1)
-            for row in self._data:
-                row.extend([""] * (count - self._columns_nb))
             self._columns_nb = count
             self.endInsertColumns()
 
@@ -258,26 +279,21 @@ class SpreadsheetModel(QAbstractTableModel):
     def setCollectionName(self, name):
         """Set the current collection name."""
         if name not in self._collections["collections"]:
+            self.beginResetModel()
             self._collections["collections"][name] = {
                 "maxRow": self._maxRow,
                 "maxColumn": self._maxColumn,
                 "data": self._data,
             }
+            del self._collections["collections"][self._collectionName]
             self._collectionName = name
+            self.endResetModel()
+            self.input_text_changed.emit()
             self.save_to_file()
         else:
-            print(f"Collection '{name}' already exists.")
+            print(f"Collection name '{name}' already exists. Please choose a different name.")
 
     def save_to_file(self):
         """Save model data to a JSON file."""
         with open(f"data/general.json", "w") as f:
             json.dump(self._collections, f)
-
-    # @Slot()
-    # def findSortings(self):
-    #     """Call find_valid_sortings with the current spreadsheet data."""
-    #     try:
-    #         solutions = find_valid_sortings(self._data)
-    #         print(f"Found solutions: {solutions}")
-    #     except Exception as e:
-    #         print(f"Error finding sortings: {str(e)}")
