@@ -8,9 +8,15 @@ RowLayout {
     anchors.fill: parent
     spacing: 0
 
-    RowHeader {}
+    RowHeader {
+        Layout.preferredWidth: 40
+        Layout.fillHeight: true
+        cellHeight: tableView.cellHeight
+    }
 
     SpreadsheetTableView {
         id: tableView
+        Layout.fillWidth: true
+        Layout.fillHeight: true
     }
 }

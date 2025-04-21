@@ -1,11 +1,8 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Layouts
 
 TableView {
     id: tableView
-    Layout.fillWidth: true
-    Layout.fillHeight: true
     model: spreadsheetModel
     clip: true
 
