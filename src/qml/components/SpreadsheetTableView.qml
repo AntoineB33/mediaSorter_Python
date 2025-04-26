@@ -6,14 +6,10 @@ TableView {
     model: spreadsheetModel
     clip: true
 
-    // Fixed cell dimensions (no recursive bindings)
-    property real cellWidth: 100
-    property real cellHeight: 30
-
     // Initialize with enough rows/columns to make scrollbars appear
     Component.onCompleted: {
-        const initRows = Math.max(spreadsheetModel.getMaxRow(), Math.floor(height / cellHeight + 1))
-        const initCols = Math.max(spreadsheetModel.getMaxColumn(), Math.floor(width / cellWidth + 1))
+        const initRows = Math.max(spreadsheetModel.getMaxRow(), spreadsheetModel.getRenderRowCount(height))
+        const initCols = Math.max(spreadsheetModel.getMaxColumn(), spreadsheetModel.getRenderColumnCount(width))
         spreadsheetModel.setRows(initRows)
         spreadsheetModel.setColumns(initCols)
     }
@@ -51,7 +47,7 @@ TableView {
                 spreadsheetModel.addRows(1)
             } else {
                 var L = spreadsheetModel.getMaxRow()
-                var n = Math.floor((tableView.contentY + tableView.height) / tableView.cellHeight + 1)
+                var n = spreadsheetModel.getRenderRowCount(tableView.contentY + tableView.height)
                 var requiredRows = Math.max(L + 1, n)
                 var currentRows = spreadsheetModel.rowCount()
                 if (requiredRows != currentRows) {
@@ -72,7 +68,7 @@ TableView {
                 spreadsheetModel.addColumns(1)
             } else {
                 var L = spreadsheetModel.getMaxColumn()
-                var n = Math.floor((tableView.contentX + tableView.width) / tableView.cellWidth + 1)
+                var n = spreadsheetModel.getRenderColumnCount(tableView.contentX + tableView.width)
                 var requiredCols = Math.max(L + 1, n)
                 var currentCols = spreadsheetModel.columnCount()
                 if (requiredCols != currentCols) {

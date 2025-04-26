@@ -9,9 +9,9 @@ RowLayout {
     spacing: 0
 
     RowHeader {
+        y: spreadsheetModel.rowHeight(1)
         Layout.preferredWidth: 40
         Layout.fillHeight: true
-        cellHeight: tableView.cellHeight
     }
 
     SpreadsheetTableView {

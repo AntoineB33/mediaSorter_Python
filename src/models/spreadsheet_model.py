@@ -1,6 +1,7 @@
 import sys
 import json
 from pathlib import Path
+from math import floor
 from PySide6.QtCore import (
     QAbstractTableModel,
     Qt,
@@ -20,21 +21,28 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._data = []
+        self._cellHorizPadding = 2
+        self._cellVertPadding = 2
+        self._textWidth = 36
+        self._textHeight = 16
         self._rows_nb = 0
         self._columns_nb = 0
         self._collections = {
             "collections": {},
         }
         self._collectionName = self.getDefaultSpreadsheetName()
+        self._data = []
+        self._rowHeights = []
+        self._colWidths = []
         self._maxRow = 0
         self._maxColumn = 0
-        self._collection = {"maxRow": 0, "maxColumn": 0, "data": []}
+        self._collection = {"data": [], "rowHeights": [], "colWidths": [], "maxRow": 0, "maxColumn": 0}
         self._collections = {
             "collections": {self._collectionName: self._collection},
             "collectionName": self._collectionName,
         }
         try:
+            Path("data").mkdir(parents=True, exist_ok=True)
             with open(f"data/general.json", "r") as f:
                 collections = json.load(f)
             if collections:
@@ -43,9 +51,11 @@ class SpreadsheetModel(QAbstractTableModel):
                 self._collection = collections["collections"].get(
                     self._collectionName, {}
                 )
+                self._data = self._collection["data"]
+                self._rowHeights = self._collection["rowHeights"]
+                self._colWidths = self._collection["colWidths"]
                 self._maxRow = self._collection["maxRow"]
                 self._maxColumn = self._collection["maxColumn"]
-                self._data = self._collection["data"]
         except FileNotFoundError:
             # No saved data, initialize with defaults if needed
             pass
@@ -62,6 +72,26 @@ class SpreadsheetModel(QAbstractTableModel):
     def getCollectionName(self):
         """Return the current collection name."""
         return self._collectionName
+
+    @Slot(int, result=int)
+    def rowHeight(self, row):
+        """Return the height of a row."""
+        if row >= self._maxColumn:
+            previous_height = self._rowHeights[self._maxColumn - 1] if self._maxColumn > 0 else 0
+            return previous_height + (row - self._maxColumn) * (self._cellVertPadding * 2 + self._textHeight)
+        return self._rowHeights[row]
+
+    @Slot(int, result=int)
+    def getRenderRowCount(self, height):
+        """Return the number of rows that can be rendered in the given height."""
+        if height <= 0:
+            return 0
+        row_count = 0
+        for i in range(self._maxRow):
+            row_count += self._rowHeights[i] + self._cellVertPadding * 2 + self._textHeight
+            if row_count > height:
+                return i + 1
+        return self._maxRow + floor(1 + (height - row_count) / (self._cellVertPadding * 2 + self._textHeight))
 
     @Slot(result=str)
     def getDefaultSpreadsheetName(self, base_name = "Default"):
@@ -94,12 +124,16 @@ class SpreadsheetModel(QAbstractTableModel):
             name = self.getDefaultSpreadsheetName(name)
         self._collections["collections"][name] = {
             "data": [],
+            "rowHeights": [],
+            "colWidths": [],
             "maxRow": 0,
             "maxColumn": 0,
         }
         self._collectionName = name
         self._collection = self._collections["collections"][name]
         self._data = self._collection["data"]
+        self._rowHeights = self._collection["rowHeights"]
+        self._colWidths = self._collection["colWidths"]
         self._maxRow = self._collection["maxRow"]
         self._maxColumn = self._collection["maxColumn"]
         self.endResetModel()
@@ -116,14 +150,18 @@ class SpreadsheetModel(QAbstractTableModel):
             if not self._collections["collections"]:
                 self._collections["collections"] = {
                     self.getDefaultSpreadsheetName(): {
+                        "data": [],
+                        "rowHeights": [],
+                        "colWidths": [],
                         "maxRow": 0,
                         "maxColumn": 0,
-                        "data": [],
                     }
                 }
             self._collectionName = self._collections["collections"].keys()[0]
             self._collection = self._collections["collections"][self._collectionName]
             self._data = self._collection["data"]
+            self._rowHeights = self._collection["rowHeights"]
+            self._colWidths = self._collection["colWidths"]
             self._maxRow = self._collection["maxRow"]
             self._maxColumn = self._collection["maxColumn"]
             self.endResetModel()
@@ -145,6 +183,8 @@ class SpreadsheetModel(QAbstractTableModel):
             self._collectionName = name
             self._collection = collection
             self._data = self._collection["data"]
+            self._rowHeights = self._collection["rowHeights"]
+            self._colWidths = self._collection["colWidths"]
             self._maxRow = self._collection["maxRow"]
             self._maxColumn = self._collection["maxColumn"]
             self.endResetModel()
@@ -177,11 +217,16 @@ class SpreadsheetModel(QAbstractTableModel):
                 if row >= self._maxRow:
                     for i in range(row - self._maxRow + 1):
                         self._data.append([""] * self._maxColumn)
+                        previous_height = self._rowHeights[-1] if self._maxRow > 0 else 0
+                        self._rowHeights.append(previous_height + self._cellVertPadding * 2 + self._textHeight)
                     self._maxRow = row + 1
                     self._collection["maxRow"] = self._maxRow
                 if col >= self._maxColumn:
                     for aRow in self._data:
                         aRow.extend([""] * (col - self._maxColumn + 1))
+                    for i in range(col - self._maxColumn + 1):
+                        previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
+                        self._colWidths.append(previous_width + self._rowWidth
                     self._maxColumn = col + 1
                     self._collection["maxColumn"] = self._maxColumn
                 self._data[row][col] = value
@@ -190,9 +235,10 @@ class SpreadsheetModel(QAbstractTableModel):
                 if row == self._maxRow - 1:
                     for i in range(self._maxRow - 1, -1, -1):
                         if self._data[i].count("") == self._maxColumn:
+                            self._data.pop(i)
+                            self._rowHeights.pop(i)
                             self._maxRow -= 1
                             self._collection["maxRow"] = self._maxRow
-                            self._data.pop(i)
                         else:
                             break
                 if col == self._maxColumn - 1:
@@ -204,6 +250,12 @@ class SpreadsheetModel(QAbstractTableModel):
                                 aRow.pop(i)
                         else:
                             break
+            if row < self._maxColumn:
+                previous_height = self._rowHeights[row - 1] if row > 0 else 0
+                height_diff = previous_height + self._cellVertPadding * 2 + self._textHeight * value.count("\n") - self._rowHeights[row]
+                if height_diff:
+                    for i in range(row, self._maxColumn):
+                        self._rowHeights[i] += height_diff
             self.endResetModel()
             # Emit dataChanged for both EditRole and DisplayRole
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
@@ -281,9 +333,10 @@ class SpreadsheetModel(QAbstractTableModel):
         if name not in self._collections["collections"]:
             self.beginResetModel()
             self._collections["collections"][name] = {
+                "data": self._data,
+                "_rowHeights": self._rowHeights,
                 "maxRow": self._maxRow,
                 "maxColumn": self._maxColumn,
-                "data": self._data,
             }
             del self._collections["collections"][self._collectionName]
             self._collectionName = name
