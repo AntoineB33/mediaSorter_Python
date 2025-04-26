@@ -77,9 +77,17 @@ class SpreadsheetModel(QAbstractTableModel):
     def rowHeight(self, row):
         """Return the height of a row."""
         if row >= self._maxColumn:
-            previous_height = self._rowHeights[self._maxColumn - 1] if self._maxColumn > 0 else 0
+            previous_height = self._rowHeights[-1] if self._maxColumn > 0 else 0
             return previous_height + (row - self._maxColumn) * (self._cellVertPadding * 2 + self._textHeight)
         return self._rowHeights[row]
+
+    @Slot(int, result=int)
+    def columnWidth(self, column):
+        """Return the width of a column."""
+        if column >= self._maxColumn:
+            previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
+            return previous_width + (column - self._maxColumn) * (self._cellHorizPadding * 2 + self._textWidth)
+        return self._colWidths[column]
 
     @Slot(int, result=int)
     def getRenderRowCount(self, height):
@@ -92,6 +100,18 @@ class SpreadsheetModel(QAbstractTableModel):
             if row_count > height:
                 return i + 1
         return self._maxRow + floor(1 + (height - row_count) / (self._cellVertPadding * 2 + self._textHeight))
+    
+    @Slot(int, result=int)
+    def getRenderColumnCount(self, width):
+        """Return the number of columns that can be rendered in the given width."""
+        if width <= 0:
+            return 0
+        column_count = 0
+        for i in range(self._maxColumn):
+            column_count += self._colWidths[i] + self._cellHorizPadding * 2 + self._textWidth
+            if column_count > width:
+                return i + 1
+        return self._maxColumn + floor(1 + (width - column_count) / (self._cellHorizPadding * 2 + self._textWidth))
 
     @Slot(result=str)
     def getDefaultSpreadsheetName(self, base_name = "Default"):
@@ -226,7 +246,7 @@ class SpreadsheetModel(QAbstractTableModel):
                         aRow.extend([""] * (col - self._maxColumn + 1))
                     for i in range(col - self._maxColumn + 1):
                         previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
-                        self._colWidths.append(previous_width + self._rowWidth
+                        self._colWidths.append(previous_width + self._cellHorizPadding * 2 + self._textWidth)
                     self._maxColumn = col + 1
                     self._collection["maxColumn"] = self._maxColumn
                 self._data[row][col] = value
@@ -250,12 +270,17 @@ class SpreadsheetModel(QAbstractTableModel):
                                 aRow.pop(i)
                         else:
                             break
-            if row < self._maxColumn:
+            if row < self._maxRow and col < self._maxColumn:
                 previous_height = self._rowHeights[row - 1] if row > 0 else 0
-                height_diff = previous_height + self._cellVertPadding * 2 + self._textHeight * value.count("\n") - self._rowHeights[row]
+                height_diff = previous_height + self._cellVertPadding * 2 + self._textHeight * (value.count("\n") + 1) - self._rowHeights[row]
                 if height_diff:
                     for i in range(row, self._maxColumn):
                         self._rowHeights[i] += height_diff
+                previous_width = self._colWidths[col - 1] if col > 0 else 0
+                width_diff = previous_width + self._cellHorizPadding * 2 + self._textWidth * (value.count("\n") + 1) - self._colWidths[col]
+                if width_diff:
+                    for i in range(col, self._maxColumn):
+                        self._colWidths[i] += width_diff
             self.endResetModel()
             # Emit dataChanged for both EditRole and DisplayRole
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])

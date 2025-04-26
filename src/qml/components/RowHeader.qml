@@ -10,7 +10,7 @@ ListView {
 
     delegate: Rectangle {
         width: rowHeader.width
-        height: tableView.cellHeight
+        height: spreadsheetModel.rowHeight(index + 1)
         color: "#f0f0f0"
         border.color: "#cccccc"
         

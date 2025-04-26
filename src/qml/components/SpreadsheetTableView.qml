@@ -48,7 +48,7 @@ TableView {
             } else {
                 var L = spreadsheetModel.getMaxRow()
                 var n = spreadsheetModel.getRenderRowCount(tableView.contentY + tableView.height)
-                var requiredRows = Math.max(L + 1, n)
+                var requiredRows = Math.max(L, n)
                 var currentRows = spreadsheetModel.rowCount()
                 if (requiredRows != currentRows) {
                     spreadsheetModel.setRows(requiredRows)
@@ -69,7 +69,7 @@ TableView {
             } else {
                 var L = spreadsheetModel.getMaxColumn()
                 var n = spreadsheetModel.getRenderColumnCount(tableView.contentX + tableView.width)
-                var requiredCols = Math.max(L + 1, n)
+                var requiredCols = Math.max(L, n)
                 var currentCols = spreadsheetModel.columnCount()
                 if (requiredCols != currentCols) {
                     console.log("Setting columns to " + requiredCols)

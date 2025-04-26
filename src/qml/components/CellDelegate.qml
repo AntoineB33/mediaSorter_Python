@@ -1,8 +1,6 @@
 import QtQuick
 
 Rectangle {
-    implicitWidth: tableView.cellWidth
-    implicitHeight: tableView.cellHeight
     border.color: "lightgray"
 
     TextInput {
