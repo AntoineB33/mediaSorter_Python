@@ -25,6 +25,9 @@ class SpreadsheetModel(QAbstractTableModel):
         self._cellVertPadding = 2
         self._textWidth = 36
         self._textHeight = 16
+
+        self._cellHeight = self._cellVertPadding * 2 + self._textHeight
+        self._cellWidth = self._cellHorizPadding * 2 + self._textWidth
         self._rows_nb = 0
         self._columns_nb = 0
         self._collections = {
@@ -63,6 +66,21 @@ class SpreadsheetModel(QAbstractTableModel):
             print(f"Error loading spreadsheet: {str(e)}")
         self.input_text_changed.emit()
     
+    @Slot(result=int)
+    def getCellWidth(self):
+        """Return the width of a cell."""
+        return self._cellWidth
+    
+    @Slot(result=int)
+    def getCellHeight(self):
+        """Return the height of a cell."""
+        return self._cellHeight
+
+    @Slot(result=int)
+    def getCellHorizPadding(self):
+        """Return the horizontal padding of a cell."""
+        return self._cellHorizPadding * 2
+    
     @Property(str, notify=input_text_changed)
     def input_text(self):
         """Property for the input text."""
@@ -94,24 +112,36 @@ class SpreadsheetModel(QAbstractTableModel):
         """Return the number of rows that can be rendered in the given height."""
         if height <= 0:
             return 0
-        row_count = 0
-        for i in range(self._maxRow):
-            row_count += self._rowHeights[i] + self._cellVertPadding * 2 + self._textHeight
-            if row_count > height:
-                return i + 1
-        return self._maxRow + floor(1 + (height - row_count) / (self._cellVertPadding * 2 + self._textHeight))
+        previous_height = self._rowHeights[-1] if self._maxRow > 0 else 0
+        if previous_height <= height:
+            return self._maxRow + floor(1 + (height - previous_height) / (self._cellHeight))
+        biggest_not_enough = 0
+        lowest_too_much = self._maxRow - 1
+        while biggest_not_enough != lowest_too_much - 1:
+            middle = (biggest_not_enough + lowest_too_much) // 2
+            if self._rowHeights[middle] <= height:
+                biggest_not_enough = middle
+            else:
+                lowest_too_much = middle
+        return biggest_not_enough + 1
     
     @Slot(int, result=int)
     def getRenderColumnCount(self, width):
         """Return the number of columns that can be rendered in the given width."""
         if width <= 0:
             return 0
-        column_count = 0
-        for i in range(self._maxColumn):
-            column_count += self._colWidths[i] + self._cellHorizPadding * 2 + self._textWidth
-            if column_count > width:
-                return i + 1
-        return self._maxColumn + floor(1 + (width - column_count) / (self._cellHorizPadding * 2 + self._textWidth))
+        previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
+        if previous_width <= width:
+            return self._maxColumn + floor(1 + (width - previous_width) / (self._cellWidth))
+        biggest_not_enough = 0
+        lowest_too_much = self._maxColumn - 1
+        while biggest_not_enough != lowest_too_much - 1:
+            middle = (biggest_not_enough + lowest_too_much) // 2
+            if self._colWidths[middle] <= width:
+                biggest_not_enough = middle
+            else:
+                lowest_too_much = middle
+        return biggest_not_enough + 1
 
     @Slot(result=str)
     def getDefaultSpreadsheetName(self, base_name = "Default"):

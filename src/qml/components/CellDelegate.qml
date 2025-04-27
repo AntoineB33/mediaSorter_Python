@@ -1,6 +1,7 @@
 import QtQuick
 
 Rectangle {
+    implicitHeight: 30
     border.color: "lightgray"
 
     TextInput {

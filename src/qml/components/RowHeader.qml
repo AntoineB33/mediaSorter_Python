@@ -8,17 +8,10 @@ ListView {
     interactive: false
     clip: true
 
-    delegate: Rectangle {
+    delegate: RowHeaderCell {
         width: rowHeader.width
         height: spreadsheetModel.rowHeight(index + 1)
-        color: "#f0f0f0"
-        border.color: "#cccccc"
-        
-        Text {
-            text: index + 2
-            anchors.centerIn: parent
-            font.pixelSize: 12
-        }
+        rowIndex: index + 2
     }
 
     contentY: tableView.contentY
