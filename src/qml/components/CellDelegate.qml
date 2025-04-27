@@ -1,6 +1,7 @@
 import QtQuick
 
 Rectangle {
+    implicitWidth: 100
     implicitHeight: 30
     border.color: "lightgray"
 
@@ -14,6 +15,7 @@ Rectangle {
             var modelIndex = tableView.model.index(model.row, model.column)
             // Pass value and EditRole as arguments
             var success = spreadsheetModel.setData(modelIndex, text, Qt.EditRole)
+            adjustColumnWidth(column, text);
             if (!success) {
                 console.error("Failed to update model data at index: " + model.index)
             }

@@ -1,18 +1,24 @@
 import QtQuick
 import QtQuick.Controls
 
-Rectangle {
+ListView {
     id: frozenRow
-    width: rowHeader.width
-    height: tableView.cellHeight
-    color: "#e0e0e0"
-    border.color: "#aaaaaa"
+    model: spreadsheetModel.columnCount() - 1
+    boundsBehavior: Flickable.StopAtBounds
+    // interactive: false
+    clip: true
 
-    Text {
-        text: "1"
-        anchors.centerIn: parent
-        font.pixelSize: 12
+    delegate: CellDelegate {}
+
+    contentX: tableView.contentX
+
+    Connections {
+        target: spreadsheetModel
+        function onColumnsInserted(parent, first, last) { 
+            frozenRow.model = spreadsheetModel.columnCount() - 1; 
+        }
+        function onColumnsRemoved(parent, first, last) {
+            frozenRow.model = spreadsheetModel.columnCount() - 1; 
+        }
     }
-
-    // Optional: bind to data if necessary
 }

@@ -82,3 +82,20 @@ TableView {
     // Cell delegate
     delegate: CellDelegate {}
 }
+
+// Invisible measurer Text
+Text {
+    id: textMeasurer
+    visible: false
+    font: spreadsheetModel.getFont()
+}
+
+// Every time data changes (e.g. user edits cell), you can do:
+function adjustColumnWidth(column, newText) {
+    textMeasurer.text = newText;
+    textMeasurer.font = spreadsheetModel.getFont();
+
+    const requiredWidth = textMeasurer.width + spreadsheetModel.getCellHorizPaddings();
+
+    spreadsheetModel.requestSetColumnWidth(column, requiredWidth);
+}

@@ -5,7 +5,7 @@ ListView {
     id: rowHeader
     model: spreadsheetModel.rowCount() - 1
     boundsBehavior: Flickable.StopAtBounds
-    interactive: false
+    // interactive: false
     clip: true
 
     delegate: RowHeaderCell {

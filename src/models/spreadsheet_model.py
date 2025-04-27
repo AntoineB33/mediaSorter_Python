@@ -23,11 +23,10 @@ class SpreadsheetModel(QAbstractTableModel):
         super().__init__(parent)
         self._cellHorizPadding = 2
         self._cellVertPadding = 2
-        self._textWidth = 36
-        self._textHeight = 16
-
-        self._cellHeight = self._cellVertPadding * 2 + self._textHeight
-        self._cellWidth = self._cellHorizPadding * 2 + self._textWidth
+        self._textDefaultWidth = 36
+        self._font = QFont("Arial", 12)
+        self._cellDefaultHeight = self._cellVertPadding * 2 + self._textHeight
+        self._cellDefaultWidth = self._cellHorizPadding * 2 + self._textWidth
         self._rows_nb = 0
         self._columns_nb = 0
         self._collections = {
@@ -65,19 +64,35 @@ class SpreadsheetModel(QAbstractTableModel):
         except Exception as e:
             print(f"Error loading spreadsheet: {str(e)}")
         self.input_text_changed.emit()
+
+    @Property(QFont, notify=fontChanged)
+    def font(self):
+        return self._font
+
+    # When user changes font:
+    def setFont(self, font):
+        if self._font != font:
+            self._font = font
+            self.fontChanged.emit()
     
-    @Slot(result=int)
-    def getCellWidth(self):
-        """Return the width of a cell."""
-        return self._cellWidth
+    @Slot(int, result=int)
+    def getColWidth(self, column):
+        """Return the width of a column."""
+        if column >= self._maxColumn:
+            return self._cellDefaultWidth
+        previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
+        return self._colWidths[column] - previous_width
     
-    @Slot(result=int)
-    def getCellHeight(self):
-        """Return the height of a cell."""
-        return self._cellHeight
+    @Slot(int, result=int)
+    def getRowHeight(self, row):
+        """Return the height of a row."""
+        if row >= self._maxRow:
+            return self._cellDefaultHeight
+        previous_height = self._rowHeights[-1] if self._maxRow > 0 else 0
+        return self._rowHeights[row] - previous_height
 
     @Slot(result=int)
-    def getCellHorizPadding(self):
+    def getCellHorizPaddings(self):
         """Return the horizontal padding of a cell."""
         return self._cellHorizPadding * 2
     
