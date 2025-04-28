@@ -13,11 +13,13 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtCore import QFont
 # from .generate_sortings import find_valid_sortings
 
 
 class SpreadsheetModel(QAbstractTableModel):
     input_text_changed = Signal()
+    fontChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
