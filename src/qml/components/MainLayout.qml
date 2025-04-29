@@ -20,6 +20,8 @@ RowLayout {
     }
 
     ColumnLayout {
+        id: colLayout
+
         Text {
             id: indexMeasurer
             visible: false
@@ -30,14 +32,14 @@ RowLayout {
 
         RowHeaderCell {
             id: topLeft
-            width: rowHeaderWidth
+            width: colLayout.rowHeaderWidth
             height: cellHeight
             rowIndex: 1
         }
 
         RowHeader {
             id: rowHeader
-            width: rowHeaderWidth
+            width: colLayout.rowHeaderWidth
             Layout.fillHeight: true
         }
     }

@@ -22,12 +22,13 @@ class SpreadsheetModel(QAbstractTableModel):
     input_text_changed = Signal()
     row_header_paddings_changed = Signal()
 
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._cellHorizPadding = 2
         self._cellVertPadding = 2
-        self._textDefaultWidth = 40
-        self._textDefaultHeight = 20
+        self._cellDefaultWidth = 40
+        self._cellDefaultHeight = 20
         self._defaultFont = QFont("Arial", 12)
 
         self._textMeasurerObj = None
@@ -94,7 +95,7 @@ class SpreadsheetModel(QAbstractTableModel):
         """Return the height of a row."""
         if row >= self._maxColumn:
             previous_height = self._rowHeights[-1] if self._maxColumn > 0 else 0
-            return previous_height + (row - self._maxColumn) * (self._textDefaultHeight)
+            return previous_height + (row - self._maxColumn) * (self._cellDefaultHeight)
         return self._rowHeights[row]
 
     @Slot(int, result=int)
@@ -102,7 +103,7 @@ class SpreadsheetModel(QAbstractTableModel):
         """Return the width of a column."""
         if column >= self._maxColumn:
             previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
-            return previous_width + (column - self._maxColumn) * (self._textDefaultWidth)
+            return previous_width + (column - self._maxColumn) * (self._cellDefaultWidth)
         return self._colWidths[column]
 
     @Slot(int, result=int)
@@ -112,7 +113,7 @@ class SpreadsheetModel(QAbstractTableModel):
             return 0
         previous_height = self._rowHeights[-1] if self._maxRow > 0 else 0
         if previous_height <= height:
-            return self._maxRow + floor(1 + (height - previous_height) / (self._textDefaultHeight))
+            return self._maxRow + floor(1 + (height - previous_height) / (self._cellDefaultHeight))
         biggest_not_enough = 0
         lowest_too_much = self._maxRow - 1
         while biggest_not_enough != lowest_too_much - 1:
@@ -130,7 +131,7 @@ class SpreadsheetModel(QAbstractTableModel):
             return 0
         previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
         if previous_width <= width:
-            return self._maxColumn + floor(1 + (width - previous_width) / (self._textDefaultWidth))
+            return self._maxColumn + floor(1 + (width - previous_width) / (self._cellDefaultWidth))
         biggest_not_enough = 0
         lowest_too_much = self._maxColumn - 1
         while biggest_not_enough != lowest_too_much - 1:
@@ -266,7 +267,7 @@ class SpreadsheetModel(QAbstractTableModel):
                     for i in range(row - self._maxRow + 1):
                         self._data.append([""] * self._maxColumn)
                         previous_height = self._rowHeights[-1] if self._maxRow > 0 else 0
-                        self._rowHeights.append(previous_height + self._textDefaultHeight)
+                        self._rowHeights.append(previous_height + self._cellDefaultHeight)
                     self._maxRow = row + 1
                     self._collection["maxRow"] = self._maxRow
                 if col >= self._maxColumn:
@@ -274,7 +275,7 @@ class SpreadsheetModel(QAbstractTableModel):
                         aRow.extend([""] * (col - self._maxColumn + 1))
                     for i in range(col - self._maxColumn + 1):
                         previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
-                        self._colWidths.append(previous_width + self._textDefaultWidth)
+                        self._colWidths.append(previous_width + self._cellDefaultWidth)
                     self._maxColumn = col + 1
                     self._collection["maxColumn"] = self._maxColumn
                 self._data[row][col] = value
