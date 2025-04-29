@@ -10,15 +10,23 @@ RowLayout {
 
     property int cellHeight : spreadsheetModel.getCellHeight()
 
-    ColumnLayout {
-        // Hidden Text element to measure the widest row index
-        Text {
-            id: textMeasurer
-            visible: false
-            font: spreadsheetModel.get.font()
-            text: spreadsheetModel.rowCount().toString()
+    // Hidden Text element to measure the widest row index
+    Text {
+        id: textMeasurer
+        visible: false
+        Component.onCompleted: {
+            spreadsheetModel.setTextMeasurer(textMeasurer)
         }
-        property int rowHeaderWidth: textMeasurer.width + spreadsheetModel.getCellHorizPaddings()
+    }
+
+    ColumnLayout {
+        Text {
+            id: indexMeasurer
+            visible: false
+            text: spreadsheetModel.count
+        }
+
+        property int rowHeaderWidth: indexMeasurer.width + spreadsheetModel.cellHorizPaddings
 
         RowHeaderCell {
             id: topLeft

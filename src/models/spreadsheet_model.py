@@ -10,25 +10,27 @@ from PySide6.QtCore import (
     Slot,
     Property,
     Signal,
+    QObject,
 )
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QFont
 from PySide6.QtQml import QQmlApplicationEngine
-from PySide6.QtCore import QFont
+
 # from .generate_sortings import find_valid_sortings
 
 
 class SpreadsheetModel(QAbstractTableModel):
     input_text_changed = Signal()
-    fontChanged = Signal()
+    row_header_paddings_changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._cellHorizPadding = 2
         self._cellVertPadding = 2
-        self._textDefaultWidth = 36
-        self._font = QFont("Arial", 12)
-        self._cellDefaultHeight = self._cellVertPadding * 2 + self._textHeight
-        self._cellDefaultWidth = self._cellHorizPadding * 2 + self._textWidth
+        self._textDefaultWidth = 40
+        self._textDefaultHeight = 20
+        self._defaultFont = QFont("Arial", 12)
+
+        self._textMeasurerObj = None
         self._rows_nb = 0
         self._columns_nb = 0
         self._collections = {
@@ -67,36 +69,15 @@ class SpreadsheetModel(QAbstractTableModel):
             print(f"Error loading spreadsheet: {str(e)}")
         self.input_text_changed.emit()
 
-    @Property(QFont, notify=fontChanged)
-    def font(self):
-        return self._font
-
-    # When user changes font:
-    def setFont(self, font):
-        if self._font != font:
-            self._font = font
-            self.fontChanged.emit()
-    
-    @Slot(int, result=int)
-    def getColWidth(self, column):
-        """Return the width of a column."""
-        if column >= self._maxColumn:
-            return self._cellDefaultWidth
-        previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
-        return self._colWidths[column] - previous_width
-    
-    @Slot(int, result=int)
-    def getRowHeight(self, row):
-        """Return the height of a row."""
-        if row >= self._maxRow:
-            return self._cellDefaultHeight
-        previous_height = self._rowHeights[-1] if self._maxRow > 0 else 0
-        return self._rowHeights[row] - previous_height
-
-    @Slot(result=int)
-    def getCellHorizPaddings(self):
-        """Return the horizontal padding of a cell."""
+    @Property(int, notify=row_header_paddings_changed)
+    def cellHorizPaddings(self):
         return self._cellHorizPadding * 2
+
+    @Slot(QObject)
+    def setTextMeasurer(self, o: QObject):
+        """Called from QML once textMeasurer is ready"""
+        self._textMeasurerObj = o
+        self._textMeasurerObj.setProperty("font", self._defaultFont)
     
     @Property(str, notify=input_text_changed)
     def input_text(self):
@@ -113,7 +94,7 @@ class SpreadsheetModel(QAbstractTableModel):
         """Return the height of a row."""
         if row >= self._maxColumn:
             previous_height = self._rowHeights[-1] if self._maxColumn > 0 else 0
-            return previous_height + (row - self._maxColumn) * (self._cellVertPadding * 2 + self._textHeight)
+            return previous_height + (row - self._maxColumn) * (self._textDefaultHeight)
         return self._rowHeights[row]
 
     @Slot(int, result=int)
@@ -121,7 +102,7 @@ class SpreadsheetModel(QAbstractTableModel):
         """Return the width of a column."""
         if column >= self._maxColumn:
             previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
-            return previous_width + (column - self._maxColumn) * (self._cellHorizPadding * 2 + self._textWidth)
+            return previous_width + (column - self._maxColumn) * (self._textDefaultWidth)
         return self._colWidths[column]
 
     @Slot(int, result=int)
@@ -131,7 +112,7 @@ class SpreadsheetModel(QAbstractTableModel):
             return 0
         previous_height = self._rowHeights[-1] if self._maxRow > 0 else 0
         if previous_height <= height:
-            return self._maxRow + floor(1 + (height - previous_height) / (self._cellHeight))
+            return self._maxRow + floor(1 + (height - previous_height) / (self._textDefaultHeight))
         biggest_not_enough = 0
         lowest_too_much = self._maxRow - 1
         while biggest_not_enough != lowest_too_much - 1:
@@ -149,7 +130,7 @@ class SpreadsheetModel(QAbstractTableModel):
             return 0
         previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
         if previous_width <= width:
-            return self._maxColumn + floor(1 + (width - previous_width) / (self._cellWidth))
+            return self._maxColumn + floor(1 + (width - previous_width) / (self._textDefaultWidth))
         biggest_not_enough = 0
         lowest_too_much = self._maxColumn - 1
         while biggest_not_enough != lowest_too_much - 1:
@@ -285,7 +266,7 @@ class SpreadsheetModel(QAbstractTableModel):
                     for i in range(row - self._maxRow + 1):
                         self._data.append([""] * self._maxColumn)
                         previous_height = self._rowHeights[-1] if self._maxRow > 0 else 0
-                        self._rowHeights.append(previous_height + self._cellVertPadding * 2 + self._textHeight)
+                        self._rowHeights.append(previous_height + self._textDefaultHeight)
                     self._maxRow = row + 1
                     self._collection["maxRow"] = self._maxRow
                 if col >= self._maxColumn:
@@ -293,7 +274,7 @@ class SpreadsheetModel(QAbstractTableModel):
                         aRow.extend([""] * (col - self._maxColumn + 1))
                     for i in range(col - self._maxColumn + 1):
                         previous_width = self._colWidths[-1] if self._maxColumn > 0 else 0
-                        self._colWidths.append(previous_width + self._cellHorizPadding * 2 + self._textWidth)
+                        self._colWidths.append(previous_width + self._textDefaultWidth)
                     self._maxColumn = col + 1
                     self._collection["maxColumn"] = self._maxColumn
                 self._data[row][col] = value
@@ -317,17 +298,29 @@ class SpreadsheetModel(QAbstractTableModel):
                                 aRow.pop(i)
                         else:
                             break
-            if row < self._maxRow and col < self._maxColumn:
-                previous_height = self._rowHeights[row - 1] if row > 0 else 0
-                height_diff = previous_height + self._cellVertPadding * 2 + self._textHeight * (value.count("\n") + 1) - self._rowHeights[row]
-                if height_diff:
-                    for i in range(row, self._maxColumn):
-                        self._rowHeights[i] += height_diff
-                previous_width = self._colWidths[col - 1] if col > 0 else 0
-                width_diff = previous_width + self._cellHorizPadding * 2 + self._textWidth * (value.count("\n") + 1) - self._colWidths[col]
-                if width_diff:
-                    for i in range(col, self._maxColumn):
-                        self._colWidths[i] += width_diff
+            # new_width = self._textDefaultWidth
+            # new_height = self._textDefaultHeight
+            # given_text = ""
+            # if row < self._maxRow:
+            #     given_text = value
+            #     self._textMeasurerObj.setProperty("text", given_text)
+            #     new_width = self._textMeasurerObj.property("implicitHeight")
+            #     if new_width < self._rowHeights[row]:
+            #         new_width = self._textDefaultHeight
+            #         for j in range(0, self._maxColumn):
+            #             if j!= row and self._data[row][j] not in ["", given_text]:
+            #                 given_text = self._data[row][j]
+            #                 self._textMeasurerObj.setProperty("text", given_text)
+            #                 new_width = max(new_width, self._textMeasurerObj.property("implicitHeight"))
+            #     if new_width != self._rowHeights[row]:
+            #         self._rowHeights[row] = new_width
+            #         for j in range(0, self._maxColumn):
+                        
+            # if col < self._maxColumn:
+            #     if value != given_text:
+            #         self._textMeasurerObj.setProperty("text", value)
+            #         given_text = value
+            #     new_height = self._textMeasurerObj.property("implicitHeight")
             self.endResetModel()
             # Emit dataChanged for both EditRole and DisplayRole
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
