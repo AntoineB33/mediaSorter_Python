@@ -8,7 +8,7 @@ Rectangle {
     TextInput {
         anchors.fill: parent
         anchors.margins: 2
-        text: model.display
+        // text: model.display
         onEditingFinished: {
             console.log("Editing finished. New text: " + text)
             // Ensure the model is updated

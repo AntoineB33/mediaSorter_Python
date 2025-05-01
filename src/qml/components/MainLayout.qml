@@ -8,7 +8,7 @@ RowLayout {
     anchors.fill: parent
     spacing: 0
 
-    property int cellHeight : spreadsheetModel.getCellHeight()
+    property int cellHeight : 20
 
     // Hidden Text element to measure the widest row index
     Text {
@@ -25,7 +25,8 @@ RowLayout {
         Text {
             id: indexMeasurer
             visible: false
-            text: spreadsheetModel.count
+            // text: spreadsheetModel.count
+            text: "10"
         }
 
         property int rowHeaderWidth: indexMeasurer.width + spreadsheetModel.cellHorizPaddings

@@ -91,6 +91,13 @@ class SpreadsheetModel(QAbstractTableModel):
         return self._collectionName
 
     @Slot(int, result=int)
+    def getRowHeight(self, row):
+        """Return the height of a row."""
+        if row >= self._maxRow:
+            return self._cellDefaultHeight
+        return self._rowHeights[row]
+
+    @Slot(int, result=int)
     def rowHeight(self, row):
         """Return the height of a row."""
         if row >= self._maxColumn:
@@ -251,6 +258,7 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def data(self, index, role=Qt.DisplayRole):
         if role == Qt.DisplayRole and index.isValid():
+            return ""
             if index.row() < len(self._data) and index.column() < len(self._data[index.row()]):
                 return self._data[index.row()][index.column()]
             else:
