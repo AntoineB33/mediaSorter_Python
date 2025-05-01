@@ -16,7 +16,9 @@ from PySide6.QtQml import QQmlApplicationEngine
 
 
 class SpreadsheetModel(QAbstractTableModel):
-    input_text_changed = Signal()
+    input_text_changed = Signal()# Add these properties and methods to SpreadsheetModel
+    column_width_changed = Signal(int)
+    row_height_changed = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -43,16 +45,43 @@ class SpreadsheetModel(QAbstractTableModel):
                 self._collection = collections["collections"].get(
                     self._collectionName, {}
                 )
+                self._data = self._collection["data"]
                 self._maxRow = self._collection["maxRow"]
                 self._maxColumn = self._collection["maxColumn"]
-                self._data = self._collection["data"]
         except FileNotFoundError:
             # No saved data, initialize with defaults if needed
             pass
         except Exception as e:
             print(f"Error loading spreadsheet: {str(e)}")
         self.input_text_changed.emit()
-    
+
+    @Slot(int, result=int)
+    def columnWidth(self, column):
+        if 0 <= column < len(self._collection["columnWidths"]):
+            return self._collection["columnWidths"][column]
+        return 100
+
+    @Slot(int, int)
+    def updateColumnWidth(self, column, new_width):
+        if column >= len(self._collection["columnWidths"]):
+            self._collection["columnWidths"].extend([100]*(column - len(self._collection["columnWidths"]) + 1))
+        if new_width > self._collection["columnWidths"][column]:
+            self._collection["columnWidths"][column] = new_width
+            self.column_width_changed.emit(column)
+
+    @Slot(int, result=int)
+    def rowHeight(self, row):
+        if 0 <= row < len(self._collection["rowHeights"]):
+            return self._collection["rowHeights"][row]
+        return 30
+
+    @Slot(int, int)
+    def updateRowHeight(self, row, new_height):
+        if row >= len(self._collection["rowHeights"]):
+            self._collection["rowHeights"].extend([30]*(row - len(self._collection["rowHeights"]) + 1))
+        if new_height > self._collection["rowHeights"][row]:
+            self._collection["rowHeights"][row] = new_height
+            self.row_height_changed.emit(row)
     
     @Property(str, notify=input_text_changed)
     def input_text(self):
