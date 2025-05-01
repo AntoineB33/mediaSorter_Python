@@ -68,7 +68,8 @@ Window {
 
                 function finishEditing() {
                     cell.editing = false
-                    spreadsheetModel.setCellData(row, column, text)
+                    spreadsheetModel.setCellData(row, column, editor.text)
+                    editor.focus = false  // Add this line to ensure focus release
                 }
 
                 onTextChanged: {

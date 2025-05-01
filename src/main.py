@@ -9,7 +9,13 @@ class SpreadsheetModel(QAbstractTableModel):
     def __init__(self, rows=10, columns=10):
         super().__init__()
         self._data = [[f"Row {i+1}, Col {j+1}" for j in range(columns)] for i in range(rows)]
-        self._column_widths = [100] * columns  # Initial width 100
+        self._column_widths = [100] * columns
+        
+    def roleNames(self):
+        return {
+            Qt.DisplayRole: b"display",
+            Qt.EditRole: b"edit"
+        }
 
     def rowCount(self, parent=QModelIndex()):
         return len(self._data)
@@ -25,7 +31,8 @@ class SpreadsheetModel(QAbstractTableModel):
     def setData(self, index, value, role=Qt.EditRole):
         if role == Qt.EditRole and index.isValid():
             self._data[index.row()][index.column()] = value
-            self.dataChanged.emit(index, index, [role])
+            # Notify both DisplayRole and EditRole about the change
+            self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
             return True
         return False
 
