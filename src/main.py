@@ -5,12 +5,14 @@ from PySide6.QtQml import QQmlApplicationEngine
 
 class SpreadsheetModel(QAbstractTableModel):
     column_width_changed = Signal(int)
+    row_height_changed = Signal(int)  # New signal for row height changes
 
     def __init__(self, rows=10, columns=10):
         super().__init__()
         self._data = [[f"Row {i+1}, Col {j+1}" for j in range(columns)] for i in range(rows)]
         self._column_widths = [100] * columns
-        
+        self._row_heights = [30] * rows  # Initialize row heights
+
     def roleNames(self):
         return {
             Qt.DisplayRole: b"display",
@@ -31,7 +33,6 @@ class SpreadsheetModel(QAbstractTableModel):
     def setData(self, index, value, role=Qt.EditRole):
         if role == Qt.EditRole and index.isValid():
             self._data[index.row()][index.column()] = value
-            # Notify both DisplayRole and EditRole about the change
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
             return True
         return False
@@ -52,6 +53,16 @@ class SpreadsheetModel(QAbstractTableModel):
         if 0 <= column < len(self._column_widths) and new_width > self._column_widths[column]:
             self._column_widths[column] = new_width
             self.column_width_changed.emit(column)
+
+    @Slot(int, result=int)
+    def rowHeight(self, row):
+        return self._row_heights[row] if 0 <= row < len(self._row_heights) else 30
+
+    @Slot(int, int)
+    def updateRowHeight(self, row, new_height):
+        if 0 <= row < len(self._row_heights) and new_height > self._row_heights[row]:
+            self._row_heights[row] = new_height
+            self.row_height_changed.emit(row)
 
     @Slot(int, int, str)
     def setCellData(self, row, column, value):

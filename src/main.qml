@@ -13,6 +13,7 @@ Window {
         anchors.fill: parent
         clip: true
         columnWidthProvider: function(column) { return spreadsheetModel.columnWidth(column) }
+        rowHeightProvider: function(row) { return spreadsheetModel.rowHeight(row) }
         model: spreadsheetModel
 
         property Timer layoutTimer: Timer {
@@ -23,7 +24,7 @@ Window {
         delegate: Rectangle {
             id: cell
             implicitWidth: tableView.columnWidthProvider(column)
-            implicitHeight: 30
+            implicitHeight: spreadsheetModel.rowHeight(row)
             border.color: "lightgray"
 
             property font cellFont: Qt.font({
@@ -45,6 +46,14 @@ Window {
                 }
             }
 
+            property Timer rowResizeTimer: Timer {
+                interval: 50
+                property int requiredHeight: 0
+                onTriggered: {
+                    spreadsheetModel.updateRowHeight(row, requiredHeight)
+                }
+            }
+
             Text {
                 anchors.fill: parent
                 text: cell.display
@@ -52,9 +61,10 @@ Window {
                 leftPadding: 5
                 visible: !cell.editing
                 font: cell.cellFont
+                wrapMode: Text.Wrap
             }
 
-            TextInput {
+            TextEdit {
                 id: editor
                 anchors.fill: parent
                 verticalAlignment: Text.AlignVCenter
@@ -62,14 +72,21 @@ Window {
                 visible: cell.editing
                 text: cell.display
                 font: cell.cellFont
+                wrapMode: Text.Wrap
 
                 onActiveFocusChanged: if (!activeFocus) finishEditing()
-                onEditingFinished: finishEditing()
 
                 function finishEditing() {
                     cell.editing = false
                     spreadsheetModel.setCellData(row, column, editor.text)
-                    editor.focus = false  // Add this line to ensure focus release
+                    editor.focus = false
+                }
+
+                Keys.onPressed: (event) => {
+                    if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
+                        finishEditing()
+                        event.accepted = true
+                    }
                 }
 
                 onTextChanged: {
@@ -80,12 +97,30 @@ Window {
                         cell.resizeTimer.requiredWidth = requiredWidth
                         cell.resizeTimer.restart()
                     }
+
+                    heightMetrics.text = text
+                    heightMetrics.width = cell.implicitWidth
+                    const requiredHeight = heightMetrics.implicitHeight + 10
+                    if (requiredHeight > spreadsheetModel.rowHeight(row)) {
+                        cell.rowResizeTimer.requiredHeight = requiredHeight
+                        cell.rowResizeTimer.restart()
+                    }
                 }
             }
 
             TextMetrics {
                 id: textMetrics
                 font: cell.cellFont
+            }
+
+            Text {
+                id: heightMetrics
+                text: editor.text
+                width: cell.implicitWidth
+                font: cell.cellFont
+                wrapMode: Text.Wrap
+                elide: Text.ElideNone
+                visible: false
             }
 
             MouseArea {
@@ -95,11 +130,24 @@ Window {
                     editor.forceActiveFocus()
                 }
             }
+
+            onImplicitWidthChanged: {
+                heightMetrics.text = editor.text
+                heightMetrics.width = implicitWidth
+                const requiredHeight = heightMetrics.implicitHeight + 10
+                if (requiredHeight > spreadsheetModel.rowHeight(row)) {
+                    cell.rowResizeTimer.requiredHeight = requiredHeight
+                    cell.rowResizeTimer.restart()
+                }
+            }
         }
 
         Connections {
             target: spreadsheetModel
             function onColumn_width_changed(column) {
+                tableView.layoutTimer.restart()
+            }
+            function onRow_height_changed(row) {
                 tableView.layoutTimer.restart()
             }
         }
