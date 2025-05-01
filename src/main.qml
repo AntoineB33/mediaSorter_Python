@@ -40,7 +40,9 @@ Window {
             property Timer resizeTimer: Timer {
                 interval: 50
                 property int requiredWidth: 0
-                onTriggered: spreadsheetModel.updateColumnWidth(column, requiredWidth)
+                onTriggered: {
+                    spreadsheetModel.updateColumnWidth(column, requiredWidth)
+                }
             }
 
             Text {
@@ -74,13 +76,7 @@ Window {
                     const requiredWidth = textMetrics.width + 20
                     const currentWidth = tableView.columnWidthProvider(column)
                     if (requiredWidth > currentWidth) {
-                        if (!cell.resizeTimer) {
-                            cell.resizeTimer = Qt.createQmlObject('import QtQuick; Timer { interval: 50 }', cell)
-                            cell.resizeTimer.triggered.connect(() => {
-                                spreadsheetModel.updateColumnWidth(column, requiredWidth)
-                                cell.resizeTimer.destroy()
-                            })
-                        }
+                        cell.resizeTimer.requiredWidth = requiredWidth
                         cell.resizeTimer.restart()
                     }
                 }
