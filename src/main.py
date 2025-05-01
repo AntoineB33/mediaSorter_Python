@@ -58,7 +58,7 @@ if __name__ == "__main__":
     model = SpreadsheetModel()
     engine.rootContext().setContextProperty("spreadsheetModel", model)
     
-    engine.load("main.qml")
+    engine.load("src/main.qml")
     
     if not engine.rootObjects():
         sys.exit(-1)
