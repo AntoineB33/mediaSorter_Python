@@ -1,0 +1,30 @@
+spreadsheet_model.py :
+
+
+
+CellDelegate.qml :
+
+
+
+FloatingWindow.qml :
+
+
+
+MainLayout.qml :
+
+
+
+RowHeader.qml :
+
+
+
+SpreadsheetTableView.qml :
+
+
+
+main.qml :
+
+
+
+main.py :
+

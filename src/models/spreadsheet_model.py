@@ -273,12 +273,3 @@ class SpreadsheetModel(QAbstractTableModel):
         """Save model data to a JSON file."""
         with open(f"data/general.json", "w") as f:
             json.dump(self._collections, f)
-
-    # @Slot()
-    # def findSortings(self):
-    #     """Call find_valid_sortings with the current spreadsheet data."""
-    #     try:
-    #         solutions = find_valid_sortings(self._data)
-    #         print(f"Found solutions: {solutions}")
-    #     except Exception as e:
-    #         print(f"Error finding sortings: {str(e)}")
