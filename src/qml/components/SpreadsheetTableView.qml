@@ -4,6 +4,8 @@ import QtQuick.Layouts
 
 TableView {
     id: tableView
+    columnWidthProvider: function(column) { return spreadsheetModel.columnWidth(column) }
+    rowHeightProvider: function(row) { return spreadsheetModel.rowHeight(row) }
     Layout.fillWidth: true
     Layout.fillHeight: true
     model: spreadsheetModel
@@ -12,6 +14,18 @@ TableView {
     // Fixed cell dimensions (no recursive bindings)
     property real cellWidth: 100
     property real cellHeight: 30
+    
+    // Replace existing cellWidth/cellHeight properties with:
+    property Timer layoutTimer: Timer {
+        interval: 0
+        onTriggered: tableView.forceLayout()
+    }
+
+    Connections {
+        target: spreadsheetModel
+        function onColumn_width_changed() { layoutTimer.restart() }
+        function onRow_height_changed() { layoutTimer.restart() }
+    }
 
     // Initialize with enough rows/columns to make scrollbars appear
     Component.onCompleted: {

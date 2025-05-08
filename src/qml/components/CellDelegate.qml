@@ -1,23 +1,67 @@
 import QtQuick
 
 Rectangle {
-    implicitWidth: tableView.cellWidth
-    implicitHeight: tableView.cellHeight
-    border.color: "lightgray"
-
-    TextInput {
+    implicitWidth: tableView.columnWidthProvider(column)
+    implicitHeight: tableView.rowHeightProvider(row)
+    
+    Text {
+        id: displayText
         anchors.fill: parent
-        anchors.margins: 2
         text: model.display
-        onEditingFinished: {
-            console.log("Editing finished. New text: " + text)
-            // Ensure the model is updated
-            var modelIndex = tableView.model.index(model.row, model.column)
-            // Pass value and EditRole as arguments
-            var success = spreadsheetModel.setData(modelIndex, text, Qt.EditRole)
-            if (!success) {
-                console.error("Failed to update model data at index: " + model.index)
+        padding: 4
+        wrapMode: Text.Wrap
+        visible: !editor.activeFocus
+    }
+
+    TextEdit {
+        id: editor
+        anchors.fill: parent
+        visible: activeFocus
+        text: model.display
+        wrapMode: Text.Wrap
+        padding: 4
+        
+        property TextMetrics metrics: TextMetrics {
+            id: textMetrics
+            font: editor.font
+        }
+        
+        onTextChanged: {
+            // Width calculation
+            textMetrics.text = text
+            let requiredWidth = Math.max(textMetrics.width + 10, 100)
+            if (requiredWidth > tableView.columnWidthProvider(column)) {
+                widthTimer.requiredWidth = requiredWidth
+                widthTimer.restart()
+            }
+            
+            // Height calculation
+            let availableWidth = tableView.columnWidthProvider(column)
+            let lineCount = Math.ceil(textMetrics.advanceWidth / availableWidth)
+            let requiredHeight = Math.max(lineCount * 20 + 10, 30)
+            if (requiredHeight > tableView.rowHeightProvider(row)) {
+                heightTimer.requiredHeight = requiredHeight
+                heightTimer.restart()
             }
         }
+
+        Timer {
+            id: widthTimer
+            property int requiredWidth
+            interval: 100
+            onTriggered: spreadsheetModel.updateColumnWidth(column, requiredWidth)
+        }
+
+        Timer {
+            id: heightTimer
+            property int requiredHeight
+            interval: 100
+            onTriggered: spreadsheetModel.updateRowHeight(row, requiredHeight)
+        }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        onDoubleClicked: editor.forceActiveFocus()
     }
 }

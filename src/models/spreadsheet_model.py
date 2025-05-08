@@ -23,6 +23,8 @@ class SpreadsheetModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._data = []
+        self._rowHeights = []
+        self._columnWidths = []
         self._rows_nb = 0
         self._columns_nb = 0
         self._collections = {
@@ -31,7 +33,7 @@ class SpreadsheetModel(QAbstractTableModel):
         self._collectionName = self.getDefaultSpreadsheetName()
         self._maxRow = 0
         self._maxColumn = 0
-        self._collection = {"maxRow": 0, "maxColumn": 0, "data": []}
+        self._collection = {"data": [], "rowHeights": [], "columnWidths": [], "maxRow": 0, "maxColumn": 0}
         self._collections = {
             "collections": {self._collectionName: self._collection},
             "collectionName": self._collectionName,
@@ -46,6 +48,8 @@ class SpreadsheetModel(QAbstractTableModel):
                     self._collectionName, {}
                 )
                 self._data = self._collection["data"]
+                self._rowHeights = self._collection["rowHeights"]
+                self._columnWidths = self._collection["columnWidths"]
                 self._maxRow = self._collection["maxRow"]
                 self._maxColumn = self._collection["maxColumn"]
         except FileNotFoundError:
@@ -122,6 +126,8 @@ class SpreadsheetModel(QAbstractTableModel):
             self.input_text_changed.emit()
         self._collections["collections"][name] = {
             "data": [],
+            "rowHeights": [],
+            "columnWidths": [],
             "maxRow": 0,
             "maxColumn": 0,
         }
@@ -129,6 +135,8 @@ class SpreadsheetModel(QAbstractTableModel):
         self._collectionName = name
         self._collection = self._collections["collections"][name]
         self._data = self._collection["data"]
+        self._rowHeights = self._collection["rowHeights"]
+        self._columnWidths = self._collection["columnWidths"]
         self._maxRow = 0
         self._maxColumn = 0
         self.endResetModel()
@@ -143,14 +151,18 @@ class SpreadsheetModel(QAbstractTableModel):
             if not self._collections["collections"]:
                 self._collections["collections"] = {
                     self.getDefaultSpreadsheetName(): {
+                        "data": [],
+                        "rowHeights": [],
+                        "columnWidths": [],
                         "maxRow": 0,
                         "maxColumn": 0,
-                        "data": [],
                     }
                 }
             self._collectionName = self._collections["collections"].keys()[0]
             self._collection = self._collections["collections"][self._collectionName]
             self._data = self._collection["data"]
+            self._rowHeights = self._collection["rowHeights"]
+            self._columnWidths = self._collection["columnWidths"]
             self._maxRow = self._collection["maxRow"]
             self._maxColumn = self._collection["maxColumn"]
             self.endResetModel()
@@ -172,6 +184,8 @@ class SpreadsheetModel(QAbstractTableModel):
             self._collectionName = name
             self._collection = collection
             self._data = self._collection["data"]
+            self._rowHeights = self._collection["rowHeights"]
+            self._columnWidths = self._collection["columnWidths"]
             self._maxRow = self._collection["maxRow"]
             self._maxColumn = self._collection["maxColumn"]
             self.endResetModel()
@@ -289,9 +303,11 @@ class SpreadsheetModel(QAbstractTableModel):
         """Set the current collection name."""
         if name not in self._collections["collections"]:
             self._collections["collections"][name] = {
+                "data": self._data,
+                "rowHeights": self._rowHeights,
+                "columnWidths": self._columnWidths,
                 "maxRow": self._maxRow,
                 "maxColumn": self._maxColumn,
-                "data": self._data,
             }
             self._collectionName = name
             self.save_to_file()
