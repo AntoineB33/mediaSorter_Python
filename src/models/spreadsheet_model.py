@@ -225,25 +225,11 @@ class SpreadsheetModel(QAbstractTableModel):
 
     @Slot(int)
     def addRows(self, count):
-        if count <= 0:
-            return
-        new_row_count = self._rows_nb + count
-        self.beginInsertRows(QModelIndex(), self._rows_nb, new_row_count - 1)
-        self._rows_nb = new_row_count
-        for _ in range(count):
-            self._data.append([""] * self._columns_nb)
-        self.endInsertRows()
+        self.setRows(self._rows_nb + count)
 
     @Slot(int)
     def addColumns(self, count):
-        if count <= 0:
-            return
-        new_col_count = self._columns_nb + count
-        self.beginInsertColumns(QModelIndex(), self._columns_nb, new_col_count - 1)
-        self._columns_nb = new_col_count
-        for row in self._data:
-            row.extend([""] * count)
-        self.endInsertColumns()
+        self.setColumns(self._columns_nb + count)
 
     @Slot(int)
     def setRows(self, count):
