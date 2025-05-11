@@ -79,7 +79,7 @@ class SpreadsheetModel(QAbstractTableModel):
             return self._columnWidths[column]
         return self.default_width
 
-    @Slot(int, int)
+    @Slot(int, float)
     def updateColumnWidth(self, column, new_width):
         self._columnWidths[column] = new_width
         self.column_width_changed.emit(column)
@@ -90,7 +90,7 @@ class SpreadsheetModel(QAbstractTableModel):
             return self._rowHeights[row]
         return self.default_height
 
-    @Slot(int, int)
+    @Slot(int, float)
     def updateRowHeight(self, row, new_height):
         self._rowHeights[row] = new_height
         self.row_height_changed.emit(row)
@@ -224,23 +224,24 @@ class SpreadsheetModel(QAbstractTableModel):
             if row >= self._maxRow:
                 for r in range(self._maxRow, row + 1):
                     self._data.append([""] * self._maxColumn)
+                    self._rowHeights.append(self.default_height)
                 self._maxRow = row + 1
                 self._collection["maxRow"] = self._maxRow
-                self._rowHeights.append(self.default_height)
             elif row == self._maxRow - 1 and value == "":
                 for r in range(row - 1, 0, -1):
                     if self._data[r] == [""] * self._maxColumn:
                         self._maxRow = r - 1
                         self._collection["maxRow"] = self._maxRow
                         self._data.pop(r)
+                        self._rowHeights.pop(r)
                         break
             if col >= self._maxColumn:
                 for r in self._data:
                     for _ in range(self._maxColumn, col + 1):
                         r.append("")
+                    self._columnWidths.append(self.default_width)
                 self._maxColumn = col + 1
                 self._collection["maxColumn"] = self._maxColumn
-                self._columnWidths.append(self.default_width)
             elif col == self._maxColumn - 1 and value == "":
                 for c in range(col - 1, 0, -1):
                     if all(row[c] == "" for row in self._data):
@@ -248,12 +249,13 @@ class SpreadsheetModel(QAbstractTableModel):
                         self._collection["maxColumn"] = self._maxColumn
                         for r in self._data:
                             r.pop(c)
+                        self._columnWidths.pop(c)
                         break
             if row < self._maxRow and col < self._maxColumn:
                 self._data[row][col] = value
-            self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
-            self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
-            # Emit dataChanged for both EditRole and DisplayRole
+            # TODO
+            # self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
+            # self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
             self.save_to_file()
             return True

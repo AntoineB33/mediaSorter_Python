@@ -8,6 +8,8 @@ TableView {
     Layout.fillHeight: true
     model: spreadsheetModel
     clip: true
+    columnWidthProvider: function(column) { return spreadsheetModel.columnWidth(column) }
+    rowHeightProvider: function(row) { return spreadsheetModel.rowHeight(row) }
 
     // Fixed cell dimensions (no recursive bindings)
     property real cellWidth: 100
@@ -21,7 +23,9 @@ TableView {
 
     Connections {
         target: spreadsheetModel
-        function onColumn_width_changed() { layoutTimer.restart() }
+        function onColumn_width_changed() { 
+            console.log("Column width changed");
+            layoutTimer.restart() }
         function onRow_height_changed() { layoutTimer.restart() }
     }
 
