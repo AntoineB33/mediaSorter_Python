@@ -4,8 +4,6 @@ import QtQuick.Layouts
 
 TableView {
     id: tableView
-    columnWidthProvider: function(column) { return spreadsheetModel.columnWidth(column) }
-    rowHeightProvider: function(row) { return spreadsheetModel.rowHeight(row) }
     Layout.fillWidth: true
     Layout.fillHeight: true
     model: spreadsheetModel
@@ -33,6 +31,14 @@ TableView {
         const initCols = Math.max(spreadsheetModel.getMaxColumn(), Math.floor(width / cellWidth + 1))
         spreadsheetModel.setRows(initRows)
         spreadsheetModel.setColumns(initCols)
+
+        // Trigger initial scroll update after layout
+        Qt.callLater(function() {
+            // Vertical scroll initial values
+            spreadsheetModel.verticalScroll(verticalScrollbar.position, verticalScrollbar.size, tableView.contentY, tableView.height, true)
+            // Horizontal scroll initial values
+            spreadsheetModel.horizontalScroll(horizontalScrollbar.position, horizontalScrollbar.size, tableView.contentX, tableView.width, true)
+        })
     }
 
     // Handle Shift + Wheel for horizontal scrolling
@@ -64,17 +70,7 @@ TableView {
         policy: ScrollBar.AlwaysOn
 
         onPositionChanged: {
-            if (position >= 1.0 - size) {
-                spreadsheetModel.addRows(1)
-            } else {
-                var L = spreadsheetModel.getMaxRow()
-                var n = Math.floor((tableView.contentY + tableView.height) / tableView.cellHeight + 1)
-                var requiredRows = Math.max(L + 1, n)
-                var currentRows = spreadsheetModel.rowCount()
-                if (requiredRows != currentRows) {
-                    spreadsheetModel.setRows(requiredRows)
-                }
-            }
+            spreadsheetModel.verticalScroll(position, size, tableView.contentY, tableView.height, false)
         }
     }
 
@@ -84,19 +80,7 @@ TableView {
         policy: ScrollBar.AlwaysOn
 
         onPositionChanged: {
-            if (position >= 1.0 - size) {
-                // Add a new column when the scrollbar reaches the end
-                spreadsheetModel.addColumns(1)
-            } else {
-                var L = spreadsheetModel.getMaxColumn()
-                var n = Math.floor((tableView.contentX + tableView.width) / tableView.cellWidth + 1)
-                var requiredCols = Math.max(L + 1, n)
-                var currentCols = spreadsheetModel.columnCount()
-                if (requiredCols != currentCols) {
-                    console.log("Setting columns to " + requiredCols)
-                    spreadsheetModel.setColumns(requiredCols)
-                }
-            }
+            spreadsheetModel.horizontalScroll(position, size, tableView.contentX, tableView.width, false)
         }
     }
 

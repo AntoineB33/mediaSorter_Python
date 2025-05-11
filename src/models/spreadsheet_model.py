@@ -22,6 +22,9 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.default_width = 100
+        self.default_height = 30
+
         self._data = []
         self._rowHeights = []
         self._columnWidths = []
@@ -33,11 +36,14 @@ class SpreadsheetModel(QAbstractTableModel):
         self._collectionName = self.getDefaultSpreadsheetName()
         self._maxRow = 0
         self._maxColumn = 0
-        self._collection = {"data": [], "rowHeights": [], "columnWidths": [], "maxRow": 0, "maxColumn": 0}
+        self._collection = {"data": self._data, "rowHeights": self._rowHeights,
+                            "columnWidths": self._columnWidths, "maxRow": 0, "maxColumn": 0}
         self._collections = {
             "collections": {self._collectionName: self._collection},
             "collectionName": self._collectionName,
         }
+        if not Path("data").exists():
+            Path("data").mkdir(parents=True, exist_ok=True)
         try:
             with open(f"data/general.json", "r") as f:
                 collections = json.load(f)
@@ -57,35 +63,37 @@ class SpreadsheetModel(QAbstractTableModel):
             pass
         except Exception as e:
             print(f"Error loading spreadsheet: {str(e)}")
+        self._verticalScrollPosition = 0
+        self._verticalScrollSize = 0
+        self._tableViewContentY = 0
+        self._tableViewHeight = 0
+        self._horizontalScrollPosition = 0
+        self._horizontalScrollSize = 0
+        self._tableViewContentX = 0
+        self._tableViewWidth = 0
         self.input_text_changed.emit()
 
     @Slot(int, result=int)
     def columnWidth(self, column):
-        if 0 <= column < len(self._collection["columnWidths"]):
-            return self._collection["columnWidths"][column]
-        return 100
+        if 0 <= column < len(self._columnWidths):
+            return self._columnWidths[column]
+        return self.default_width
 
     @Slot(int, int)
     def updateColumnWidth(self, column, new_width):
-        if column >= len(self._collection["columnWidths"]):
-            self._collection["columnWidths"].extend([100]*(column - len(self._collection["columnWidths"]) + 1))
-        if new_width > self._collection["columnWidths"][column]:
-            self._collection["columnWidths"][column] = new_width
-            self.column_width_changed.emit(column)
+        self._columnWidths[column] = new_width
+        self.column_width_changed.emit(column)
 
     @Slot(int, result=int)
     def rowHeight(self, row):
-        if 0 <= row < len(self._collection["rowHeights"]):
-            return self._collection["rowHeights"][row]
-        return 30
+        if 0 <= row < len(self._rowHeights):
+            return self._rowHeights[row]
+        return self.default_height
 
     @Slot(int, int)
     def updateRowHeight(self, row, new_height):
-        if row >= len(self._collection["rowHeights"]):
-            self._collection["rowHeights"].extend([30]*(row - len(self._collection["rowHeights"]) + 1))
-        if new_height > self._collection["rowHeights"][row]:
-            self._collection["rowHeights"][row] = new_height
-            self.row_height_changed.emit(row)
+        self._rowHeights[row] = new_height
+        self.row_height_changed.emit(row)
     
     @Property(str, notify=input_text_changed)
     def input_text(self):
@@ -203,20 +211,48 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def data(self, index, role=Qt.DisplayRole):
         if role == Qt.DisplayRole and index.isValid():
-            return self._data[index.row()][index.column()]
+            if index.row() < self._maxRow and index.column() < self._maxColumn:
+                return self._data[index.row()][index.column()]
+            else:
+                return ""
         return None
 
     def setData(self, index, value, role=Qt.EditRole):
         if role == Qt.EditRole and index.isValid():
             row = index.row()
             col = index.column()
-            self._data[row][col] = value
             if row >= self._maxRow:
+                for r in range(self._maxRow, row + 1):
+                    self._data.append([""] * self._maxColumn)
                 self._maxRow = row + 1
                 self._collection["maxRow"] = self._maxRow
+                self._rowHeights.append(self.default_height)
+            elif row == self._maxRow - 1 and value == "":
+                for r in range(row - 1, 0, -1):
+                    if self._data[r] == [""] * self._maxColumn:
+                        self._maxRow = r - 1
+                        self._collection["maxRow"] = self._maxRow
+                        self._data.pop(r)
+                        break
             if col >= self._maxColumn:
+                for r in self._data:
+                    for _ in range(self._maxColumn, col + 1):
+                        r.append("")
                 self._maxColumn = col + 1
                 self._collection["maxColumn"] = self._maxColumn
+                self._columnWidths.append(self.default_width)
+            elif col == self._maxColumn - 1 and value == "":
+                for c in range(col - 1, 0, -1):
+                    if all(row[c] == "" for row in self._data):
+                        self._maxColumn = c
+                        self._collection["maxColumn"] = self._maxColumn
+                        for r in self._data:
+                            r.pop(c)
+                        break
+            if row < self._maxRow and col < self._maxColumn:
+                self._data[row][col] = value
+            self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
+            self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
             # Emit dataChanged for both EditRole and DisplayRole
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
             self.save_to_file()
@@ -237,13 +273,10 @@ class SpreadsheetModel(QAbstractTableModel):
             return
         if count < self._rows_nb:
             self.beginRemoveRows(QModelIndex(), count, self._rows_nb - 1)
-            self._data = self._data[:count]
             self._rows_nb = count
             self.endRemoveRows()
         elif count > self._rows_nb:
             self.beginInsertRows(QModelIndex(), self._rows_nb, count - 1)
-            for _ in range(count - self._rows_nb):
-                self._data.append([""] * self._columns_nb)
             self._rows_nb = count
             self.endInsertRows()
 
@@ -253,16 +286,46 @@ class SpreadsheetModel(QAbstractTableModel):
             return
         if count < self._columns_nb:
             self.beginRemoveColumns(QModelIndex(), count, self._columns_nb - 1)
-            for row in self._data:
-                row = row[:count]
             self._columns_nb = count
             self.endRemoveColumns()
         elif count > self._columns_nb:
             self.beginInsertColumns(QModelIndex(), self._columns_nb, count - 1)
-            for row in self._data:
-                row.extend([""] * (count - self._columns_nb))
             self._columns_nb = count
             self.endInsertColumns()
+    
+    @Slot(float, float, float, float, bool)
+    def verticalScroll(self, position, size, tableViewContentY, tableViewHeight, start=False):
+        self._verticalScrollPosition = position
+        self._verticalScrollSize = size
+        self._tableViewContentY = tableViewContentY
+        self._tableViewHeight = tableViewHeight
+        if start:
+            return
+        if position >= 1.0 - size:
+            self.addRows(1)
+        else:
+            n = int((tableViewContentY + tableViewHeight) / self.default_height + 1)
+            requiredRows = max(self._maxRow + 1, n)
+            currentRows = self.rowCount()
+            if requiredRows != currentRows:
+                self.setRows(requiredRows)
+    
+    @Slot(float, float, float, float, bool)
+    def horizontalScroll(self, position, size, tableViewContentX, tableViewWidth, start=False):
+        self._horizontalScrollPosition = position
+        self._horizontalScrollSize = size
+        self._tableViewContentX = tableViewContentX
+        self._tableViewWidth = tableViewWidth
+        if start:
+            return
+        if position >= 1.0 - size:
+            self.addColumns(1)
+        else:
+            n = int((tableViewContentX + tableViewWidth) / self.default_width + 1)
+            requiredCols = max(self._maxColumn + 1, n)
+            currentCols = self.columnCount()
+            if requiredCols != currentCols:
+                self.setColumns(requiredCols)
 
     @Slot(result=int)
     def getMaxRow(self):
