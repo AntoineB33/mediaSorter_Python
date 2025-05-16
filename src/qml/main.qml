@@ -18,4 +18,20 @@ Window {
         tableView: mainLayout.tableView
     }
 
+    Connections {
+        target: spreadsheetModel
+        function onSignal(data) {
+            switch (data.type) {
+                case "input_text_changed":
+                    inputField.text = data.value;
+                    break;
+                case "layoutTimer_restart":
+                    mainLayout.tableView.layoutTimer.restart();
+                    break;
+                default:
+                    console.warn("Unknown signal type:", data.type);
+            }
+        }
+    }
+
 }

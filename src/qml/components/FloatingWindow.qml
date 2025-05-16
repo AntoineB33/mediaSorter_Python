@@ -96,7 +96,7 @@ Rectangle {
                 rightPadding: 40
                 color: "#333333"
                 selectionColor: "#2196F3"
-                text: spreadsheetModel.input_text
+                text: spreadsheetModel.get_collectionName()
 
                 cursorDelegate: Rectangle {
                     visible: inputField.cursorVisible

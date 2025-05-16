@@ -8,9 +8,19 @@ RowLayout {
     anchors.fill: parent
     spacing: 0
 
-    RowHeader {}
+    ColumnLayout {
+        spacing: 0
 
-    SpreadsheetTableView {
-        id: tableView
+        RowHeaderCell {}
+        RowHeader {}
+    }
+
+    ColumnLayout {
+        spacing: 0
+
+        FrozenFirstRow {}
+        SpreadsheetTableView {
+            id: tableView
+        }
     }
 }

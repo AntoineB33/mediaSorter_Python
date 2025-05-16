@@ -11,25 +11,17 @@ ListView {
     interactive: false
     clip: true
 
-    delegate: Rectangle {
-        width: rowHeader.width
-        height: tableView.cellHeight
-        color: "#f0f0f0"
-        border.color: "#cccccc"
-        
-        Text {
-            text: index + 1
-            anchors.centerIn: parent
-            font.pixelSize: 12
-        }
+    delegate: RowHeaderCell {
+        id: rowHeaderCell
+        index: model.index
     }
 
     contentY: tableView.contentY
 
     Connections {
         target: spreadsheetModel
-        function onRowsInserted(parent, first, last) { 
-            rowHeader.model = spreadsheetModel.rowCount(); 
+        function onRowsInserted(parent, first, last) {
+            rowHeader.model = spreadsheetModel.rowCount();
         }
         function onRowsRemoved(parent, first, last) { 
             rowHeader.model = spreadsheetModel.rowCount(); 
