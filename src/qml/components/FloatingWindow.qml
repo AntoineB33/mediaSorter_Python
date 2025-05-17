@@ -39,11 +39,16 @@ Rectangle {
             let horizScrollHeight = tableView.ScrollBar.horizontal.height
             
             // Check if mouse is over the scrollbars
-            let overVertScrollbar = (mouse.x + floatingWindow.x > vertScrollPos && 
-                                    mouse.x + floatingWindow.x < vertScrollPos + vertScrollWidth)
+            // let overVertScrollbar = (mouse.x + floatingWindow.x > vertScrollPos && 
+            //                         mouse.x + floatingWindow.x < vertScrollPos + vertScrollWidth)
+            let overVertScrollbar = floatingWindow.x + width + mouse.x > vertScrollPos 
             
-            let overHorizScrollbar = (mouse.y + floatingWindow.y > horizScrollPos && 
-                                     mouse.y + floatingWindow.y < horizScrollPos + horizScrollHeight)
+            let overHorizScrollbar = floatingWindow.y + height + mouse.y > horizScrollPos
+            // console.log("overHorizScrollbar:", overHorizScrollbar)
+            // console.log("mouse.y:", mouse.y)
+            // console.log("floatingWindow.y:", floatingWindow.y)
+            // console.log("horizScrollPos:", horizScrollPos)
+            // console.log("horizScrollHeight:", horizScrollHeight)
             
             // Disable dragging when over scrollbars
             drag.target = (overVertScrollbar || overHorizScrollbar) ? null : floatingWindow
