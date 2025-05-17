@@ -13,6 +13,7 @@ Rectangle {
         pointSize: spreadsheetModel.get_font_size(),
     })
 
+    required property int index
     required property int column
     required property int row
     required property string display

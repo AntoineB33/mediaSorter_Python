@@ -218,7 +218,6 @@ class SpreadsheetModel(QAbstractTableModel):
 
     @Slot(result=int)
     def columnCount(self, parent=None):
-        print("columnCount", self._columns_nb)
         return int(self._columns_nb)
 
     def data(self, index, role=Qt.DisplayRole):
