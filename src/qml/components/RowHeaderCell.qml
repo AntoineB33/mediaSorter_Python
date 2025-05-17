@@ -8,7 +8,7 @@ Rectangle {
     color: "#f0f0f0"
     border.color: "#cccccc"
 
-    property int index: 1
+    property int index: 0
     
     Text {
         text: index + 1

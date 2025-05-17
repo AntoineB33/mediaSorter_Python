@@ -13,7 +13,7 @@ ListView {
 
     delegate: RowHeaderCell {
         id: rowHeaderCell
-        index: model.index
+        index: model.index + 1
     }
 
     contentY: tableView.contentY

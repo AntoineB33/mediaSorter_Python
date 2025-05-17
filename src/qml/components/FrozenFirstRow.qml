@@ -4,7 +4,8 @@ import QtQuick.Layouts
 
 ListView {
     id: frozenFirstRow
-    Layout.preferredHeight: 40
+    orientation: Qt.Horizontal
+    Layout.preferredHeight: spreadsheetModel.rowHeight(0)
     Layout.fillWidth: true
     model: spreadsheetModel.columnCount()
     boundsBehavior: Flickable.StopAtBounds

@@ -212,12 +212,14 @@ class SpreadsheetModel(QAbstractTableModel):
             self.signal.emit({"type": "input_text_changed", "value": self._collectionName})
             return False
 
+    @Slot(result=int)
     def rowCount(self, parent=None):
         return self._rows_nb
 
+    @Slot(result=int)
     def columnCount(self, parent=None):
         print("columnCount", self._columns_nb)
-        return self._columns_nb
+        return int(self._columns_nb)
 
     def data(self, index, role=Qt.DisplayRole):
         if role == Qt.DisplayRole and index.isValid():
