@@ -15,49 +15,13 @@ Rectangle {
 
     // Drag handling
     MouseArea {
-        id: dragArea
         anchors.fill: parent
         drag.target: floatingWindow
         drag.axis: Drag.XAndYAxis
-        
-        // Minimum boundary constraints to keep the window within the main window
         drag.minimumX: 0
-        drag.maximumX: parent.parent.width - floatingWindow.width
+        drag.maximumX: tableView.x + tableView.width - floatingWindow.width - tableView.ScrollBar.vertical.width
         drag.minimumY: 0
-        drag.maximumY: parent.parent.height - floatingWindow.height
-        
-        // This allows clicking through to controls inside the floating window
-        // but still enables dragging behavior on empty areas
-        propagateComposedEvents: true
-        
-        // Detect when dragging over scrollbars and disable dragging
-        onPositionChanged: function(mouse) {
-            // Get absolute positions of the vertical and horizontal scrollbars
-            let vertScrollPos = tableView.ScrollBar.vertical.x + tableView.x
-            let vertScrollWidth = tableView.ScrollBar.vertical.width
-            let horizScrollPos = tableView.ScrollBar.horizontal.y + tableView.y
-            let horizScrollHeight = tableView.ScrollBar.horizontal.height
-            
-            // Check if mouse is over the scrollbars
-            // let overVertScrollbar = (mouse.x + floatingWindow.x > vertScrollPos && 
-            //                         mouse.x + floatingWindow.x < vertScrollPos + vertScrollWidth)
-            let overVertScrollbar = floatingWindow.x + width + mouse.x > vertScrollPos 
-            
-            let overHorizScrollbar = floatingWindow.y + height + mouse.y > horizScrollPos
-            // console.log("overHorizScrollbar:", overHorizScrollbar)
-            // console.log("mouse.y:", mouse.y)
-            // console.log("floatingWindow.y:", floatingWindow.y)
-            // console.log("horizScrollPos:", horizScrollPos)
-            // console.log("horizScrollHeight:", horizScrollHeight)
-            
-            // Disable dragging when over scrollbars
-            drag.target = (overVertScrollbar || overHorizScrollbar) ? null : floatingWindow
-        }
-        
-        onReleased: {
-            // Always re-enable dragging when released
-            drag.target = floatingWindow
-        }
+        drag.maximumY: tableView.y + tableView.height - floatingWindow.height - tableView.ScrollBar.horizontal.height
     }
 
     MouseArea {

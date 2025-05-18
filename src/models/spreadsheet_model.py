@@ -12,7 +12,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
-# from .generate_sortings import find_valid_sortings
+from .generate_sortings import find_valid_sortings
 from PySide6.QtGui import QFont, QFontMetrics
 
 
@@ -252,7 +252,7 @@ class SpreadsheetModel(QAbstractTableModel):
                     for _ in range(self._maxColumn, col + 1):
                         r.append("")
                     prevWidth = self._columnWidths[col - 1] if col > 0 else 0
-                    self._columnWidths.append(self.columnWidth(-1)) - prevWidth
+                    self._columnWidths.append(self.columnWidth(-1) - prevWidth)
                 self._maxColumn = col + 1
                 self._collection["maxColumn"] = self._maxColumn
             elif col == self._maxColumn - 1 and value == "":
