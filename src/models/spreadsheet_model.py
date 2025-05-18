@@ -12,8 +12,9 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
-from .generate_sortings import find_valid_sortings
 from PySide6.QtGui import QFont, QFontMetrics
+from models.generate_sortings import find_valid_sortings
+import threading
 
 
 class SpreadsheetModel(QAbstractTableModel):
@@ -74,6 +75,15 @@ class SpreadsheetModel(QAbstractTableModel):
         self._horizontalScrollSize = 0
         self._tableViewContentX = 0
         self._tableViewWidth = 0
+        
+        table = [[] for i in range(50)]
+        table[0] = ["after 1", "as far as possible from 1"]
+        thread = threading.Thread(target=self.compute_and_print_sorting, args=(table,))
+        thread.start()
+    
+    def compute_and_print_sorting(self, table):
+        sorting = find_valid_sortings(table)
+        print("Sorting result:", sorting)
     
     @Slot(result=str)
     def get_font_family(self):
