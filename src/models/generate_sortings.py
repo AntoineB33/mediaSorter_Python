@@ -1,6 +1,6 @@
 from networkx import DiGraph, topological_sort, NetworkXUnfeasible, simple_cycles
 import os
-
+from ortools.sat.python import cp_model
 
 def reduce_redundancy(table):
     """
@@ -53,32 +53,29 @@ def reduce_redundancy(table):
 
     return reduced_table
 
+class SolutionCollector(cp_model.CpSolverSolutionCallback):
+    def __init__(self, pos_vars, n, max_solutions):
+        cp_model.CpSolverSolutionCallback.__init__(self)
+        self.pos_vars = pos_vars
+        self.n = n
+        self.max_solutions = max_solutions
+        self.solutions = []
+        self.count = 0
+
+    def OnSolutionCallback(self):
+        if self.count >= self.max_solutions:
+            return
+        current_pos = [self.Value(var) for var in self.pos_vars]
+        permutation = sorted(range(self.n), key=lambda x: current_pos[x])
+        self.solutions.append(permutation)
+        self.count += 1
+        if self.count >= self.max_solutions:
+            self.StopSearch()
+
+    def get_solutions(self):
+        return self.solutions
 
 def find_valid_sortings(table):
-    from ortools.sat.python import cp_model  # Moved import here
-
-    class SolutionCollector(cp_model.CpSolverSolutionCallback):
-        def __init__(self, pos_vars, n, max_solutions):
-            cp_model.CpSolverSolutionCallback.__init__(self)
-            self.pos_vars = pos_vars
-            self.n = n
-            self.max_solutions = max_solutions
-            self.solutions = []
-            self.count = 0
-
-        def OnSolutionCallback(self):
-            if self.count >= self.max_solutions:
-                return
-            current_pos = [self.Value(var) for var in self.pos_vars]
-            permutation = sorted(range(self.n), key=lambda x: current_pos[x])
-            self.solutions.append(permutation)
-            self.count += 1
-            if self.count >= self.max_solutions:
-                self.StopSearch()
-
-        def get_solutions(self):
-            return self.solutions
-
     n = len(table)
     
     # Build dependency graph and parse optimization goals

@@ -13,8 +13,10 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtGui import QFont, QFontMetrics
-from models.generate_sortings import find_valid_sortings
-import threading
+from src.models.generate_sortings import find_valid_sortings
+from models.lazy_loader import ortools_ready
+ortools_ready.result()
+find_valid_sortings()
 
 
 class SpreadsheetModel(QAbstractTableModel):
