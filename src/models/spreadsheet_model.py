@@ -13,14 +13,21 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtGui import QFont, QFontMetrics
-from src.models.generate_sortings import find_valid_sortings
-from models.lazy_loader import ortools_ready
-ortools_ready.result()
-find_valid_sortings()
+import threading
+from queue import Queue, Empty
+from time import sleep
 
 
 class SpreadsheetModel(QAbstractTableModel):
     signal = Signal(dict)
+    
+    # Sync primitives
+    ortools_loaded = threading.Event()
+    shutdown_signal = threading.Event()
+
+    # Separate queues for tasks and results
+    tasks_queue = Queue()
+    results_queue = Queue()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -77,15 +84,36 @@ class SpreadsheetModel(QAbstractTableModel):
         self._horizontalScrollSize = 0
         self._tableViewContentX = 0
         self._tableViewWidth = 0
-        
-        table = [[] for i in range(50)]
-        table[0] = ["after 1", "as far as possible from 1"]
-        thread = threading.Thread(target=self.compute_and_print_sorting, args=(table,))
-        thread.start()
     
-    def compute_and_print_sorting(self, table):
-        sorting = find_valid_sortings(table)
-        print("Sorting result:", sorting)
+        def load_ortools(self):
+            global find_valid_sortings
+            from generate_sortings import find_valid_sortings
+            self.ortools_loaded.set()
+
+        def task_worker(self):
+            """Process tasks sequentially and populate results queue"""
+            while not self.shutdown_signal.is_set():
+                try:
+                    args = self.tasks_queue.get(timeout=0.1)
+                    print(f"Processing task with args: {args}")
+                    sleep(3)  # Simulate computation
+                    self.results_queue.put(args[0])  # Store actual result
+                    self.tasks_queue.task_done()
+                except Empty:
+                    continue
+
+        def call_find_valid_sortings_then_store_result(self, *args):
+            self.ortools_loaded.wait()
+            self.tasks_queue.put(args)
+
+        def display_last_result(self):
+            while not self.shutdown_signal.is_set():
+                try:
+                    result = self.results_queue.get(timeout=0.1)
+                    print("Result:", result)
+                    self.results_queue.task_done()
+                except Empty:
+                    continue
     
     @Slot(result=str)
     def get_font_family(self):
