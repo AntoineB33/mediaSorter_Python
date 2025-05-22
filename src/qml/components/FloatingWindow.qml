@@ -19,9 +19,9 @@ Rectangle {
         drag.target: floatingWindow
         drag.axis: Drag.XAndYAxis
         drag.minimumX: 0
-        drag.maximumX: tableView.x + tableView.width - floatingWindow.width - tableView.ScrollBar.vertical.width
+        drag.maximumX: mainWindow.width - floatingWindow.width - tableView.ScrollBar.vertical.width
         drag.minimumY: 0
-        drag.maximumY: tableView.y + tableView.height - floatingWindow.height - tableView.ScrollBar.horizontal.height
+        drag.maximumY: mainWindow.height - floatingWindow.height - tableView.ScrollBar.horizontal.height
     }
 
     MouseArea {
@@ -29,8 +29,8 @@ Rectangle {
         enabled: dropdown.opened
         onPressed: (mouse) => {
             console.log("Mouse pressed at:", mouse.x, mouse.y)
-            // Check Popup bounds using global coordinates
-            const popupLeft = dropdown.x
+            // Check Popup bounds using global coordintes
+            const popupLeft = dropdown.xa
             const popupRight = dropdown.x + dropdown.width
             const popupTop = dropdown.y
             const popupBottom = dropdown.y + dropdown.height

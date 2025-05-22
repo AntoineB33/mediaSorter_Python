@@ -16,6 +16,7 @@ RowLayout {
     }
 
     ColumnLayout {
+        id: tableWithFrozenRow
         spacing: 0
 
         FrozenFirstRow {}

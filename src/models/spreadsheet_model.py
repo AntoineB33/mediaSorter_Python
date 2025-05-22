@@ -85,35 +85,35 @@ class SpreadsheetModel(QAbstractTableModel):
         self._tableViewContentX = 0
         self._tableViewWidth = 0
     
-        def load_ortools(self):
-            global find_valid_sortings
-            from generate_sortings import find_valid_sortings
-            self.ortools_loaded.set()
+    def load_ortools(self):
+        global find_valid_sortings
+        from generate_sortings import find_valid_sortings
+        self.ortools_loaded.set()
 
-        def task_worker(self):
-            """Process tasks sequentially and populate results queue"""
-            while not self.shutdown_signal.is_set():
-                try:
-                    args = self.tasks_queue.get(timeout=0.1)
-                    print(f"Processing task with args: {args}")
-                    sleep(3)  # Simulate computation
-                    self.results_queue.put(args[0])  # Store actual result
-                    self.tasks_queue.task_done()
-                except Empty:
-                    continue
+    def task_worker(self):
+        """Process tasks sequentially and populate results queue"""
+        while not self.shutdown_signal.is_set():
+            try:
+                args = self.tasks_queue.get(timeout=0.1)
+                print(f"Processing task with args: {args}")
+                sleep(3)  # Simulate computation
+                self.results_queue.put(args[0])  # Store actual result
+                self.tasks_queue.task_done()
+            except Empty:
+                continue
 
-        def call_find_valid_sortings_then_store_result(self, *args):
-            self.ortools_loaded.wait()
-            self.tasks_queue.put(args)
+    def call_find_valid_sortings_then_store_result(self, *args):
+        self.ortools_loaded.wait()
+        self.tasks_queue.put(args)
 
-        def display_last_result(self):
-            while not self.shutdown_signal.is_set():
-                try:
-                    result = self.results_queue.get(timeout=0.1)
-                    print("Result:", result)
-                    self.results_queue.task_done()
-                except Empty:
-                    continue
+    def display_last_result(self):
+        while not self.shutdown_signal.is_set():
+            try:
+                result = self.results_queue.get(timeout=0.1)
+                print("Result:", result)
+                self.results_queue.task_done()
+            except Empty:
+                continue
     
     @Slot(result=str)
     def get_font_family(self):
@@ -304,6 +304,8 @@ class SpreadsheetModel(QAbstractTableModel):
                             r.pop(c)
                         self._columnWidths.pop(c)
                         break
+            if row < self._maxRow and col < self._maxColumn:
+                self._data[row][col] = value
             self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
             self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])

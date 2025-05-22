@@ -55,6 +55,7 @@ Rectangle {
         }
 
         onTextChanged: {
+            console.log("Text changed:", text)
             var modelIndex = spreadsheetModel.index(row, column)
             var success = spreadsheetModel.setData(modelIndex, text, Qt.EditRole)
         }
