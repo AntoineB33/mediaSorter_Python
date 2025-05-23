@@ -26,9 +26,10 @@ TableView {
         // Trigger initial scroll update after ensuring layout is complete
         Qt.callLater(function() {
             tableView.forceLayout() // Force layout update
-            // Vertical scroll initial values
             spreadsheetModel.verticalScroll(verticalScrollbar.position, verticalScrollbar.size, tableView.contentY, tableView.height, true)
-            // Horizontal scroll initial values
+            spreadsheetModel.horizontalScroll(horizontalScrollbar.position, horizontalScrollbar.size, tableView.contentX, tableView.width, true)
+            tableView.forceLayout()
+            spreadsheetModel.verticalScroll(verticalScrollbar.position, verticalScrollbar.size, tableView.contentY, tableView.height, true)
             spreadsheetModel.horizontalScroll(horizontalScrollbar.position, horizontalScrollbar.size, tableView.contentX, tableView.width, true)
         })
     }
