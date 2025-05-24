@@ -1,73 +1,61 @@
-import QtQuick
+import QtQuick 2.15
+import QtQuick.Controls 2.15
 
 Rectangle {
-    id: cell
-    implicitWidth: spreadsheetModel.columnWidth(column)
-    implicitHeight: spreadsheetModel.rowHeight(row)
-    border.color: "lightgray"
-
-    property int verticalPadding: spreadsheetModel.get_vertical_padding()
-    property font cellFont: Qt.font({
-        family: spreadsheetModel.get_font_family(),
-        pointSize: spreadsheetModel.get_font_size(),
-    })
-    
-    required property int index
-    required property int column
-    required property int row
-    required property string display
+    property alias text: textInput.text
+    property bool header: false
     property bool editing: false
-    property string editText: ""  // Added to track edited text
+    
+    implicitWidth: 100
+    implicitHeight: 40
+    
+    color: header ? "#f0f0f0" : "#ffffff"
+    border.color: editing ? "blue" : "#d0d0d0"
 
     Text {
+        id: displayText
         anchors.fill: parent
-        text: cell.display
         verticalAlignment: Text.AlignVCenter
-        leftPadding: cell.verticalPadding
-        rightPadding: cell.verticalPadding
-        visible: !cell.editing
-        font: cell.cellFont
+        horizontalAlignment: Text.AlignHCenter
+        text: parent.text
+        visible: !editing
+        font.bold: header
+        color: header ? "#404040" : "#000000"
     }
 
-    TextEdit {
-        id: editor
+    TextInput {
+        id: textInput
         anchors.fill: parent
         verticalAlignment: Text.AlignVCenter
-        leftPadding: cell.verticalPadding
-        rightPadding: cell.verticalPadding
-        visible: cell.editing
-        text: cell.editText  // Bind to editText instead of display
-        font: cell.cellFont
-
-        onActiveFocusChanged: if (!activeFocus) finishEditing()
-
-        function finishEditing() {
-            cell.editing = false
-            editor.focus = false
-        }
-
-        Keys.onPressed: (event) => {
-            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
-                finishEditing()
-                event.accepted = true
+        horizontalAlignment: Text.AlignHCenter
+        visible: editing
+        font: displayText.font
+        selectByMouse: true
+        onAccepted: {
+            // Commit changes when pressing Enter
+            if (editing) {
+                editing = false
+                spreadsheetModel.setData(spreadsheetModel.index, text, Qt.EditRole)
             }
         }
         
-        onTextChanged: {
-            // Update model immediately on text change
-            var modelIndex = spreadsheetModel.index(row, column)
-            var success = spreadsheetModel.setData(modelIndex, text, Qt.EditRole)
+        onActiveFocusChanged: {
+            // Commit changes when losing focus
+            if (!activeFocus && editing) {
+                editing = false
+                spreadsheetModel.setData(spreadsheetModel.index, text, Qt.EditRole)
+            }
         }
-
-        // Removed onTextChanged that updated the model
     }
 
     MouseArea {
         anchors.fill: parent
-        onClicked: {
-            cell.editing = true
-            cell.editText = cell.display  // Initialize editText with current value
-            editor.forceActiveFocus()
+        onDoubleClicked: {
+            if (!header) {
+                editing = true
+                textInput.forceActiveFocus()
+                textInput.selectAll()
+            }
         }
     }
 }

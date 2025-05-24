@@ -6,7 +6,7 @@ from PySide6.QtCore import QAbstractTableModel, Qt, QUrl, QModelIndex, Slot, Pro
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
-from models.spreadsheet_model import SpreadsheetModel
+from models.spreadsheet_model import HeaderProxyModel, DataProxyModel, SpreadsheetModel
 
 def main():
     # Set the QT_QUICK_CONTROLS_STYLE environment variable
@@ -14,12 +14,18 @@ def main():
     os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"  # Set the style to Fusion
 
     app = QGuiApplication(sys.argv)
-    model = SpreadsheetModel()
+    spreadsheetModel = SpreadsheetModel()
+    header_model = HeaderProxyModel()
+    header_model.setSourceModel(spreadsheetModel)
+    data_model = DataProxyModel()
+    data_model.setSourceModel(spreadsheetModel)
     
     engine = QQmlApplicationEngine()
-    
+
     # 1. Set context property FIRST
-    engine.rootContext().setContextProperty("spreadsheetModel", model)
+    engine.rootContext().setContextProperty("headerModel", header_model)
+    engine.rootContext().setContextProperty("dataModel", data_model)
+    engine.rootContext().setContextProperty("spreadsheetModel", spreadsheetModel)
     
     # 2. Configure paths AFTER setting context
     current_dir = Path(__file__).parent
@@ -35,7 +41,7 @@ def main():
         sys.exit(-1)
     
     # Connect save handler
-    app.aboutToQuit.connect(model.save_to_file)
+    app.aboutToQuit.connect(spreadsheetModel.save_to_file)
     
     sys.exit(app.exec())
     

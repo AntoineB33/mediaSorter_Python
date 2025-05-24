@@ -6,13 +6,9 @@ TableView {
     id: tableView
     Layout.fillWidth: true
     Layout.fillHeight: true
-    model: spreadsheetModel
     clip: true
     // columnWidthProvider: function(column) { return spreadsheetModel.columnWidth(column) }
     // rowHeightProvider: function(row) { return spreadsheetModel.rowHeight(row) }
-    rowHeightProvider: function(row) {
-        return row === 0 ? 0 : spreadsheetModel.rowHeight(row)
-    }
 
     // Fixed cell dimensions (no recursive bindings)
     // property real cellWidth: 100
@@ -80,6 +76,13 @@ TableView {
         }
     }
 
+    columnWidthProvider: function(column) { return sourceModel.columnWidths[column] }
+    rowHeightProvider: function(row) { return sourceModel.rowHeights[row + 1] }
+
     // Cell delegate
-    delegate: CellDelegate {}
+    delegate: CellDelegate {
+        implicitWidth: columnWidthProvider(column)
+        implicitHeight: rowHeightProvider(row)
+        text: dataModel.display
+    }
 }

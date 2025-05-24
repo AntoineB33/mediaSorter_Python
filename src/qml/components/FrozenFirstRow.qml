@@ -7,15 +7,16 @@ ListView {
     orientation: Qt.Horizontal
     Layout.preferredHeight: spreadsheetModel.rowHeight(0)
     Layout.fillWidth: true
-    model: spreadsheetModel.columnCount()
     boundsBehavior: Flickable.StopAtBounds
     interactive: false
     clip: true
+    model: headerModel
 
     delegate: CellDelegate {
-        row: 0
-        column: index
-        display: spreadsheetModel.data(spreadsheetModel.index(0, index), Qt.DisplayRole)
+        width: headerModel.columnWidth(index)
+        height: headerModel.rowHeight(0)
+        text: model.display
+        header: true
     }
 
     contentX: tableView.contentX
