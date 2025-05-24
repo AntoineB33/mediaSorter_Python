@@ -10,6 +10,9 @@ TableView {
     clip: true
     // columnWidthProvider: function(column) { return spreadsheetModel.columnWidth(column) }
     // rowHeightProvider: function(row) { return spreadsheetModel.rowHeight(row) }
+    rowHeightProvider: function(row) {
+        return row === 0 ? 0 : spreadsheetModel.rowHeight(row)
+    }
 
     // Fixed cell dimensions (no recursive bindings)
     // property real cellWidth: 100

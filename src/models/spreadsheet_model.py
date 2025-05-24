@@ -275,7 +275,7 @@ class SpreadsheetModel(QAbstractTableModel):
             if row >= self._maxRow:
                 for r in range(self._maxRow, row + 1):
                     self._data.append([""] * self._maxColumn)
-                    prevHeight = self._rowHeights[r - 1] if r > 0 else 0
+                    prevHeight = self._rowHeights[-1] if self._maxRow > 0 else 0
                     self._rowHeights.append(prevHeight + self.rowHeight(-1))
                 self._maxRow = row + 1
                 self._collection["maxRow"] = self._maxRow
@@ -291,8 +291,8 @@ class SpreadsheetModel(QAbstractTableModel):
                 for r in self._data:
                     for _ in range(self._maxColumn, col + 1):
                         r.append("")
-                    prevWidth = self._columnWidths[col - 1] if col > 0 else 0
-                    self._columnWidths.append(self.columnWidth(-1) - prevWidth)
+                    prevWidth = self._columnWidths[-1] if self._maxColumn > 0 else 0
+                    self._columnWidths.append(prevWidth + self.columnWidth(-1))
                 self._maxColumn = col + 1
                 self._collection["maxColumn"] = self._maxColumn
             elif col == self._maxColumn - 1 and value == "":
@@ -369,9 +369,8 @@ class SpreadsheetModel(QAbstractTableModel):
                 requiredRows = lowerBound
             else:
                 prevHeight = self._rowHeights[-1] if self._maxRow > 0 else 0
-                requiredRows = self._maxRow + (sizeToReach - prevHeight) // self.rowHeight(-1) + 1
-            currentRows = self.rowCount()
-            if requiredRows != currentRows:
+                requiredRows = self._maxRow + (sizeToReach - prevHeight) // self.rowHeight(-1) + 2
+            if requiredRows != self._rows_nb:
                 self.setRows(requiredRows)
     
     @Slot(float, float, float, float, bool)
@@ -397,8 +396,7 @@ class SpreadsheetModel(QAbstractTableModel):
             else:
                 prevWidth = self._columnWidths[-1] if self._maxColumn > 0 else 0
                 requiredColumns = self._maxColumn + (sizeToReach - prevWidth) // self.columnWidth(-1) + 1
-            currentColumns = self.columnCount()
-            if requiredColumns != currentColumns:
+            if requiredColumns != self._columns_nb:
                 self.setColumns(requiredColumns)
 
     @Slot(result=int)
