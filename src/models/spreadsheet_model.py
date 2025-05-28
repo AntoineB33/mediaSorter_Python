@@ -19,24 +19,6 @@ import threading
 from queue import Queue, Empty
 from time import sleep
 
-
-class FirstRowModel(QAbstractListModel):
-    def __init__(self, table_data=None):
-        super().__init__()
-        self._table = table_data or []
-        self._first_row = self._table[0] if self._table else []
-
-    def rowCount(self, parent=QModelIndex()):
-        return len(self._first_row)
-
-    def data(self, index, role=Qt.DisplayRole):
-        if role == Qt.DisplayRole and index.isValid():
-            return self._first_row[index.row()]
-        return None
-
-    def roleNames(self):
-        return {Qt.DisplayRole: b'value'}
-
 class SpreadsheetModel(QAbstractTableModel):
     signal = Signal(dict)
     
@@ -61,7 +43,7 @@ class SpreadsheetModel(QAbstractTableModel):
         self._rowHeights = []
         self._columnWidths = []
         self._rows_nb = 0
-        self._columns_nb = 1
+        self._columns_nb = 0
         self._collections = {
             "collections": {},
         }
@@ -279,28 +261,31 @@ class SpreadsheetModel(QAbstractTableModel):
             col = index.column()
             if row >= len(self._data):
                 for r in range(len(self._data), row + 1):
-                    self._data.append([""] * (len(self._data[0]) if self._data else 0))
                     prevHeight = self._rowHeights[-1] if self._data else 0
                     self._rowHeights.append(prevHeight + self.rowHeight(-1))
+                    self._data.append([""] * (len(self._data[0]) if self._data else 0))
             elif row == len(self._data) - 1 and value == "":
-                for r in range(row - 1, 0, -1):
-                    if self._data[r] == [""] * (len(self._data[0]) if self._data else 0):
+                for r in range(row - 1, -1, -1):
+                    if self._data[r] == [""] * len(self._data[0]):
                         self._data.pop(r)
                         self._rowHeights.pop(r)
                         break
-            if col >= (len(self._data[0]) if self._data else 0):
-                for r in self._data:
-                    for _ in range((len(self._data[0]) if self._data else 0), col + 1):
-                        r.append("")
-                    prevWidth = self._columnWidths[-1] if self._data else 0
-                    self._columnWidths.append(prevWidth + self.columnWidth(-1))
-            elif col == (len(self._data[0]) if self._data else 0) - 1 and value == "":
-                for c in range(col - 1, 0, -1):
-                    if all(row[c] == "" for row in self._data):
-                        for r in self._data:
-                            r.pop(c)
-                        self._columnWidths.pop(c)
-                        break
+            if self._data:
+                if col >= len(self._data[0]):
+                    prev_col_nb = len(self._data[0])
+                    for r in self._data:
+                        for _ in range(prev_col_nb, col + 1):
+                            r.append("")
+                    for _ in range(prev_col_nb, col + 1):
+                        prevWidth = self._columnWidths[-1] if len(self._columnWidths) else 0
+                        self._columnWidths.append(prevWidth + self.columnWidth(-1))
+                elif col == len(self._data[0]) - 1 and value == "":
+                    for c in range(col - 1, 0, -1):
+                        if all(row[c] == "" for row in self._data):
+                            for r in self._data:
+                                r.pop(c)
+                            self._columnWidths.pop(c)
+                            break
             if row < len(self._data) and col < len(self._data[0]):
                 self._data[row][col] = value
             self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
