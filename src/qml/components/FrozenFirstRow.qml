@@ -13,9 +13,25 @@ ListView {
     clip: true
 
     delegate: CellDelegate {
+        id: cellDelegate
         row: 0
         column: index
         display: spreadsheetModel.data(spreadsheetModel.index(0, index), Qt.DisplayRole)
+        // Add a connection to listen for data changes
+        Connections {
+            target: spreadsheetModel
+            function onDataChanged(topLeft, bottomRight, roles) {
+                // Check if this cell's data was changed
+                if (topLeft.row <= 0 && bottomRight.row >= 0 && 
+                    topLeft.column <= index && bottomRight.column >= index) {
+                    // Update the display property
+                    cellDelegate.display = spreadsheetModel.data(
+                        spreadsheetModel.index(0, index), 
+                        Qt.DisplayRole
+                    )
+                }
+            }
+        }
     }
 
     contentX: tableView.contentX

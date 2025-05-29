@@ -247,7 +247,6 @@ class SpreadsheetModel(QAbstractTableModel):
         return self._columns_nb
 
     def data(self, index, role=Qt.DisplayRole):
-        print(f"row: {index.row()}, column: {index.column()}, role: {role}")
         if role == Qt.DisplayRole and index.isValid():
             if index.row() < len(self._data) and index.column() < (len(self._data[0]) if self._data else 0):
                 return self._data[index.row()][index.column()]
