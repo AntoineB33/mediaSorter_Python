@@ -231,12 +231,17 @@ Rectangle {
 
             Button {
                 text: "Sort"
-                // onClicked: spreadsheetModel.findSortings()
+                onClicked: spreadsheetModel.sortButton()
             }
 
             Button {
                 text: "Button 2"
             }
+        }
+
+        Text {
+            id: errorText
+            text: ""
         }
     }
 }

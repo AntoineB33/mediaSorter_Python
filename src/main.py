@@ -7,19 +7,27 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
 from models.spreadsheet_model import SpreadsheetModel
+from qasync import QEventLoop, asyncSlot
+import asyncio
 
-def main():
-    # Set the QT_QUICK_CONTROLS_STYLE environment variable
-    # os.environ["QT_QUICK_CONTROLS_STYLE"] = "Material"
-    os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"  # Set the style to Fusion
+
+async def main():
+    os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
 
     app = QGuiApplication(sys.argv)
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
+
     model = SpreadsheetModel()
     
     engine = QQmlApplicationEngine()
     
     # 1. Set context property FIRST
     engine.rootContext().setContextProperty("spreadsheetModel", model)
+
+    from PySide6.QtCore import QTimer
+    QTimer.singleShot(0, model._start_async_tasks)
+
     
     # 2. Configure paths AFTER setting context
     current_dir = Path(__file__).parent
@@ -36,8 +44,10 @@ def main():
     
     # Connect save handler
     app.aboutToQuit.connect(model.save_to_file)
-    
-    sys.exit(app.exec())
-    
+
+    with loop:
+        sys.exit(loop.run_forever())
+
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

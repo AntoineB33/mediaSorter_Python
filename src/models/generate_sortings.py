@@ -2,6 +2,7 @@ from networkx import DiGraph, topological_sort, NetworkXUnfeasible, simple_cycle
 import os
 from ortools.sat.python import cp_model
 
+import re
 def reduce_redundancy(table):
     """
     Reduces redundancy in the dependency table by removing implied constraints.
@@ -14,7 +15,7 @@ def reduce_redundancy(table):
     for i in range(n):
         for entry in table[i]:
             if entry.startswith("after "):
-                j = int(entry.split()[1])
+                j = int(entry.split()[1]) + 1
                 graph[i].add(j)  # Edge: j -> i (i must come after j)
 
     # Compute ancestors for each node (all nodes that must come before it)
@@ -86,14 +87,16 @@ def find_valid_sortings(table):
     
     for i in range(n):
         for entry in table[i]:
-            if entry.startswith("after "):
-                j = int(entry.split()[1])
+            match = re.match(r'after\s+([1-9][0-9]*)', entry)
+            if match:
+                j = int(match.group(1)) - 1
                 dependencies[i].append(j)
                 graph.add_edge(j, i)
-            elif entry.startswith("as far as possible from "):
-                x_str = entry.split("from ")[1]
-                X = int(x_str)
-                optimization_terms.append((i, X))
+            else:
+                match = re.match(r'as far as possible from (\d+)', entry)
+                if match:
+                    X = int(match.group(1)) - 1
+                    optimization_terms.append((i, X))
     
     # Check if the dependency graph is a DAG
     try:
@@ -103,10 +106,9 @@ def find_valid_sortings(table):
         try:
             cycle = next(simple_cycles(graph))  # Get the first cycle
             cycle_str = ' -> '.join(map(str, cycle)) + f' -> {cycle[0]}'
-            print(f"The dependency graph contains a cycle: {cycle_str}")
+            return f"The dependency graph contains a cycle: {cycle_str}"
         except StopIteration:
-            print("The dependency graph is not a DAG (unexpected error).")
-        return []
+            return "The dependency graph is not a DAG (unexpected error)."
     
     # If no optimization terms, return the topological order
     if not optimization_terms:

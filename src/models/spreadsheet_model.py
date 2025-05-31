@@ -18,17 +18,14 @@ from PySide6.QtGui import QFont, QFontMetrics
 import threading
 from queue import Queue, Empty
 from time import sleep
+import asyncio
+from qasync import asyncSlot
+from asyncio import get_event_loop
 
 class SpreadsheetModel(QAbstractTableModel):
     signal = Signal(dict)
-    
-    # Sync primitives
     ortools_loaded = threading.Event()
-    shutdown_signal = threading.Event()
-
-    # Separate queues for tasks and results
-    tasks_queue = Queue()
-    results_queue = Queue()
+    task_queue = asyncio.Queue()
 
     def __init__(self, parent=None):
         super().__init__()
@@ -54,6 +51,9 @@ class SpreadsheetModel(QAbstractTableModel):
             "collections": {self._collectionName: self._collection},
             "collectionName": self._collectionName,
         }
+        self._checkings_wip = []
+        self._sortings_wip = []
+        self.task_queue = asyncio.Queue()
         if not Path("data").exists():
             Path("data").mkdir(parents=True, exist_ok=True)
         try:
@@ -63,6 +63,8 @@ class SpreadsheetModel(QAbstractTableModel):
                 self._collections = collections
                 self._collectionName = collections["collectionName"]
                 self.loadSpreadsheet(self._collectionName)
+                self._checkings_wip = collections["checkings_wip"]
+                self._sortings_wip = collections["sortings_wip"]
         except FileNotFoundError:
             # No saved data, initialize with defaults if needed
             pass
@@ -76,36 +78,44 @@ class SpreadsheetModel(QAbstractTableModel):
         self._horizontalScrollSize = 0
         self._tableViewContentX = 0
         self._tableViewWidth = 0
-    
-    def load_ortools(self):
-        global find_valid_sortings
-        from generate_sortings import find_valid_sortings
-        self.ortools_loaded.set()
+        self._data_lock = asyncio.Lock()
+            
+    def _start_async_tasks(self):
+        print("Starting async tasks")
+        asyncio.create_task(self.task_worker())
+        asyncio.create_task(self.add_task(["load_ortools", None]))
+        for collection_name in self._checkings_wip:
+            asyncio.create_task(self.add_task(["checkings", collection_name]))
+        for collection_name in self._sortings_wip:
+            asyncio.create_task(self.add_task(["sortings", collection_name]))
 
-    def task_worker(self):
-        """Process tasks sequentially and populate results queue"""
-        while not self.shutdown_signal.is_set():
-            try:
-                args = self.tasks_queue.get(timeout=0.1)
-                print(f"Processing task with args: {args}")
-                sleep(3)  # Simulate computation
-                self.results_queue.put(args[0])  # Store actual result
-                self.tasks_queue.task_done()
-            except Empty:
-                continue
-
-    def call_find_valid_sortings_then_store_result(self, *args):
-        self.ortools_loaded.wait()
-        self.tasks_queue.put(args)
-
-    def display_last_result(self):
-        while not self.shutdown_signal.is_set():
-            try:
-                result = self.results_queue.get(timeout=0.1)
-                print("Result:", result)
-                self.results_queue.task_done()
-            except Empty:
-                continue
+    async def add_task(self, task_name):
+        await self.task_queue.put(task_name)
+        print(f"Task added: {task_name[0]} for collection {task_name[1]}")
+        
+    async def task_worker(self):
+        print("Task worker started")
+        while True:
+            task = await self.task_queue.get()
+            if task[0] == "load_ortools":
+                global find_valid_sortings
+                from models.generate_sortings import find_valid_sortings
+                self.ortools_loaded.set()
+            if task[0] == "checkings":
+                self.ortools_loaded.wait()
+                data = self._collections["collections"][task[1]]["data"]
+                res = find_valid_sortings(data)
+                if type(res) is str:
+                    self.signal.emit({"type": "FloatingWindow_text_changed", "value": res})
+                else:
+                    async with self._data_lock:
+                        if task[1] == self._collectionName:
+                            self.beginResetModel()
+                            self._data = [data[i] for i in res[0]]
+                            self.endResetModel()
+                            self.save_to_file()
+                self._checkings_wip.remove(task[1])
+            self.task_queue.task_done()
     
     @Slot(result=str)
     def get_font_family(self):
@@ -154,65 +164,68 @@ class SpreadsheetModel(QAbstractTableModel):
             i += 1
         return f"Default_{i}"
 
-    @Slot(str)
-    def setSpreadsheetName(self, name):
+    @asyncSlot(str)
+    async def setSpreadsheetName(self, name):
         """Set the current spreadsheet name."""
         if name in self._collections["collections"]:
             return
-        self.beginResetModel()
-        self._collections["collections"][name] = self._collection
-        del self._collections["collections"][self._collectionName]
-        self._collectionName = name
-        self.endResetModel()
-        self.save_to_file()
+        async with self._data_lock:
+            self.beginResetModel()
+            self._collections["collections"][name] = self._collection
+            del self._collections["collections"][self._collectionName]
+            self._collectionName = name
+            self.endResetModel()
+            self.save_to_file()
 
-    @Slot(str)
-    def createCollection(self, name):
+    @asyncSlot(str)
+    async def createCollection(self, name):
         """Create a new collection with the given name."""
         if name in self._collections["collections"]:
             name = self.getDefaultSpreadsheetName()
             self._collectionName = name
             self.signal.emit({"type": "input_text_changed", "value": self._collectionName})
-        self._collections["collections"][name] = {
-            "data": [],
-            "rowHeights": [],
-            "columnWidths": [],
-            "maxRow": 0,
-            "maxColumn": 0,
-        }
-        self.beginResetModel()
-        self._collectionName = name
-        self._collection = self._collections["collections"][name]
-        self._data = self._collection["data"]
-        self._rowHeights = self._collection["rowHeights"]
-        self._columnWidths = self._collection["columnWidths"]
-        self.endResetModel()
-        self.save_to_file()
-
-    @Slot(str)
-    def deleteCollection(self, name):
-        """Remove a collection by name."""
-        if name in self._collections["collections"]:
+        async with self._data_lock:
+            self._collections["collections"][name] = {
+                "data": [],
+                "rowHeights": [],
+                "columnWidths": [],
+                "maxRow": 0,
+                "maxColumn": 0,
+            }
             self.beginResetModel()
-            del self._collections["collections"][name]
-            if not self._collections["collections"]:
-                self._collections["collections"] = {
-                    self.getDefaultSpreadsheetName(): {
-                        "data": [],
-                        "rowHeights": [],
-                        "columnWidths": [],
-                        "maxRow": 0,
-                        "maxColumn": 0,
-                    }
-                }
-            self._collectionName = self._collections["collections"].keys()[0]
-            self._collection = self._collections["collections"][self._collectionName]
+            self._collectionName = name
+            self._collection = self._collections["collections"][name]
             self._data = self._collection["data"]
             self._rowHeights = self._collection["rowHeights"]
             self._columnWidths = self._collection["columnWidths"]
             self.endResetModel()
-            self.signal.emit({"type": "input_text_changed", "value": self._collectionName})
             self.save_to_file()
+
+    @asyncSlot(str)
+    async def deleteCollection(self, name):
+        """Remove a collection by name."""
+        if name in self._collections["collections"]:
+            async with self._data_lock:
+                self.beginResetModel()
+                del self._collections["collections"][name]
+                if not self._collections["collections"]:
+                    self._collections["collections"] = {
+                        self.getDefaultSpreadsheetName(): {
+                            "data": [],
+                            "rowHeights": [],
+                            "columnWidths": [],
+                            "maxRow": 0,
+                            "maxColumn": 0,
+                        }
+                    }
+                self._collectionName = self._collections["collections"].keys()[0]
+                self._collection = self._collections["collections"][self._collectionName]
+                self._data = self._collection["data"]
+                self._rowHeights = self._collection["rowHeights"]
+                self._columnWidths = self._collection["columnWidths"]
+                self.endResetModel()
+                self.signal.emit({"type": "input_text_changed", "value": self._collectionName})
+                self.save_to_file()
 
     @Slot(str)
     def pressEnterOnInput(self, name):
@@ -291,6 +304,9 @@ class SpreadsheetModel(QAbstractTableModel):
             self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
             self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
             self.save_to_file()
+            asyncio.create_task(self.add_task(["checkings", self._collectionName]))
+            self._checkings_wip.append(self._collectionName)
+            
             return True
         return False
 
@@ -402,3 +418,8 @@ class SpreadsheetModel(QAbstractTableModel):
         """Save model data to a JSON file."""
         with open(f"data/general.json", "w") as f:
             json.dump(self._collections, f)
+    
+    @Slot()
+    def sortButton(self):
+        self._sortings_wip.append(self._collectionName)
+        threading.Thread(target=self.thread_function).start()

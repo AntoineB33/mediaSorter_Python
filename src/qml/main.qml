@@ -28,6 +28,9 @@ Window {
                 case "layoutTimer_restart":
                     mainLayout.tableView.layoutTimer.restart();
                     break;
+                case "FloatingWindow_text_changed":
+                    floatingWindow.ErrorText.text = data.value;
+                    break;
                 default:
                     console.warn("Unknown signal type:", data.type);
             }
