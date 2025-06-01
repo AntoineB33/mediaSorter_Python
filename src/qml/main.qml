@@ -15,6 +15,7 @@ Window {
     }
     
     FloatingWindow {
+        id: floatingWindow
         tableView: mainLayout.tableView
     }
 
@@ -29,7 +30,7 @@ Window {
                     mainLayout.tableView.layoutTimer.restart();
                     break;
                 case "FloatingWindow_text_changed":
-                    floatingWindow.ErrorText.text = data.value;
+                    floatingWindow.errorTextItem.text = data.value;
                     break;
                 default:
                     console.warn("Unknown signal type:", data.type);

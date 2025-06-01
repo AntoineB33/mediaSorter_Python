@@ -6,6 +6,7 @@ Rectangle {
     id: floatingWindow
     property var tableView
     property var recommendations: []
+    property alias errorTextItem: errorText
     width: 300
     height: 200
     color: "lightblue"
@@ -242,6 +243,7 @@ Rectangle {
         Text {
             id: errorText
             text: ""
+            color: "red"
         }
     }
 }

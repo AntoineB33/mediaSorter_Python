@@ -54,9 +54,11 @@ Rectangle {
         }
         
         onTextChanged: {
-            // Update model immediately on text change
-            var modelIndex = spreadsheetModel.index(row, column)
-            var success = spreadsheetModel.setData(modelIndex, text, Qt.EditRole)
+            // Only update the model if the text is different from the display value
+            if (text !== cell.display) {
+                var modelIndex = spreadsheetModel.index(row, column)
+                var success = spreadsheetModel.setData(modelIndex, text, Qt.EditRole)
+            }
         }
 
         // Removed onTextChanged that updated the model
