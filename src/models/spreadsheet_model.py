@@ -120,6 +120,7 @@ class SpreadsheetModel(QAbstractTableModel):
                 # Wait until deque is not empty
                 await self.checkings_condition.wait_for(lambda: len(self.checkings_deque) > 0)
                 task = self.checkings_deque[0]
+                del self.checkings_deque[0]
             if task[0] == "load_ortools":
                 global find_valid_sortings
                 from models.generate_sortings import find_valid_sortings
