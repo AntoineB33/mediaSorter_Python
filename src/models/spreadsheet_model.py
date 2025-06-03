@@ -22,13 +22,14 @@ import asyncio
 from qasync import asyncSlot
 from asyncio import get_event_loop
 from collections import deque
+import re
 
 class SpreadsheetModel(QAbstractTableModel):
     signal = Signal(dict)
     ortools_loaded = threading.Event()
 
     def __init__(self, parent=None):
-        super().__init__()
+        super().__init__(parent)
 
         self.default_width = 100
         self.horizontal_padding = 5
@@ -37,6 +38,8 @@ class SpreadsheetModel(QAbstractTableModel):
 
         self.metrics = QFontMetrics(self.font)
         self.checkings_condition = asyncio.Condition()
+        self._rows_nb = 0
+        self._columns_nb = 0
         if not Path("data").exists():
             Path("data").mkdir(parents=True, exist_ok=True)
         try:
@@ -44,29 +47,27 @@ class SpreadsheetModel(QAbstractTableModel):
                 collections = json.load(f)
             if collections:
                 self._collections = collections
-                self._collectionName = collections["collectionName"]
-                self.loadSpreadsheet(self._collectionName)
-                self.checkings_deque = collections["checkings_deque"]
-                self.sortings_deque = collections["sortings_deque"]
+                self.loadSpreadsheet(collections["collectionName"])
+                self.checkings_list = collections["checkings_list"]
+                self.sortings_list = collections["sortings_list"]
         except FileNotFoundError:
-            self.checkings_deque = []
-            self.sortings_deque = []
-            self._data = []
-            self._rowHeights = []
-            self._columnWidths = []
-            self._rows_nb = 0
-            self._columns_nb = 0
             self._collections = {
                 "collections": {},
             }
+            self._collectionName = self.getDefaultSpreadsheetName()
+            self.checkings_list = []
+            self.sortings_list = []
+            self._data = []
+            self._rowHeights = []
+            self._columnWidths = []
             self._collectionName = self.getDefaultSpreadsheetName()
             self._collection = {"data": self._data, "rowHeights": self._rowHeights,
                                 "columnWidths": self._columnWidths}
             self._collections = {
                 "collections": {self._collectionName: self._collection},
                 "collectionName": self._collectionName,
-                "checkings_deque": self.checkings_deque,
-                "sortings_deque": self.sortings_deque,
+                "checkings_list": self.checkings_list,
+                "sortings_list": self.sortings_list,
             }
         self._verticalScrollPosition = 0
         self._verticalScrollSize = 0
@@ -83,47 +84,50 @@ class SpreadsheetModel(QAbstractTableModel):
         asyncio.create_task(self.checkings_worker())
 
         asyncio.create_task(self.add_task(["load_ortools", None]))
-        for collection_name in self.checkings_deque:
+        for collection_name in self.checkings_list:
             asyncio.create_task(self.add_task(["checkings", collection_name]))
-        for collection_name in self.sortings_deque:
+        for collection_name in self.sortings_list:
             asyncio.create_task(self.add_task(["sortings", collection_name]))
 
     async def add_task(self, task_name):
         async with self.checkings_condition:
             if task_name[0] == "checkings":
-                for i, task in enumerate(self.checkings_deque):
+                for i, task in enumerate(self.checkings_list):
                     if task[0] == task_name[0] and task[1] == task_name[1]:
-                        del self.checkings_deque[i]
+                        del self.checkings_list[i]
                         return
-                self.checkings_deque.insert(0, task_name)
+                self.checkings_list.insert(0, task_name)
             elif task_name[0] == "sortings":
-                for i, task in enumerate(self.sortings_deque):
+                for i, task in enumerate(self.sortings_list):
                     if task[0] == task_name[0] and task[1] == task_name[1]:
-                        del self.sortings_deque[i]
+                        del self.sortings_list[i]
                         return
-                self.sortings_deque.insert(0, task_name)
+                self.sortings_list.insert(0, task_name)
             elif task_name[0] == "change_collection":
-                for i, task in enumerate(self.checkings_deque):
+                for i, task in enumerate(self.checkings_list):
                     if task[0] == "checkings" and task[1] == task_name[1]:
-                        self.checkings_deque.insert(0, task)
-                        del self.checkings_deque[i]
+                        self.checkings_list.insert(0, task)
+                        del self.checkings_list[i]
                         break
             else:
-                self.checkings_deque.insert(0, task_name)
+                self.checkings_list.insert(0, task_name)
             self.checkings_condition.notify()
             print(f"Task added: {task_name[0]} for collection {task_name[1]}")
+
+    def load_ortools_module(self):
+        global find_valid_sortings
+        from models.generate_sortings import find_valid_sortings
         
     async def checkings_worker(self):
         print("Task worker started")
         while True:
             async with self.checkings_condition:
                 # Wait until deque is not empty
-                await self.checkings_condition.wait_for(lambda: len(self.checkings_deque) > 0)
-                task = self.checkings_deque[0]
-                del self.checkings_deque[0]
+                await self.checkings_condition.wait_for(lambda: len(self.checkings_list) > 0)
+                task = self.checkings_list[0]
+                del self.checkings_list[0]
             if task[0] == "load_ortools":
-                global find_valid_sortings
-                from models.generate_sortings import find_valid_sortings
+                await asyncio.to_thread(self.load_ortools_module)
                 self.ortools_loaded.set()
             if task[0] == "checkings":
                 self.ortools_loaded.wait()
@@ -131,11 +135,22 @@ class SpreadsheetModel(QAbstractTableModel):
                 res = find_valid_sortings(data)
                 if type(res) is str:
                     self.signal.emit({"type": "FloatingWindow_text_changed", "value": res})
-                else:
+                elif res != list(range(len(data))):
                     async with self._data_lock:
                         if task[1] == self._collectionName:
                             self.beginResetModel()
                             self._data = [data[i] for i in res[0]]
+                            for r in self._data:
+                                for c in r:
+                                    match = re.match(r'after\s+([1-9][0-9]*)', c)
+                                    if match:
+                                        j = int(match.group(1)) - 1
+                                        c = re.sub(r'(after\s+)([1-9][0-9]*)', r'\1' + data.index(j), c)
+                                    else:
+                                        match = re.match(r'as far as possible from (\d+)', c)
+                                        if match:
+                                            X = int(match.group(1)) - 1
+                                            c = re.sub(r'as far as possible from (\d+)', f'as far as possible from {data.index(X)}', c)
                             self.endResetModel()
                             self.save_to_file()
     
@@ -274,11 +289,11 @@ class SpreadsheetModel(QAbstractTableModel):
             return False
 
     @Slot(result=int)
-    def rowCount(self, parent=None):
+    def rowCount(self, parent=QModelIndex()):
         return self._rows_nb
 
     @Slot(result=int)
-    def columnCount(self, parent=None):
+    def columnCount(self, parent=QModelIndex()):
         return self._columns_nb
 
     def data(self, index, role=Qt.DisplayRole):
@@ -299,11 +314,11 @@ class SpreadsheetModel(QAbstractTableModel):
                     self._rowHeights.append(prevHeight + self.rowHeight(-1))
                     self._data.append([""] * (len(self._data[0]) if self._data else 0))
             elif row == len(self._data) - 1 and value == "":
-                for r in range(row - 1, -1, -1):
+                self._data[row][col] = ""
+                for r in range(row, -1, -1):
                     if self._data[r] == [""] * len(self._data[0]):
                         self._data.pop(r)
                         self._rowHeights.pop(r)
-                        break
             if self._data:
                 if col >= len(self._data[0]):
                     prev_col_nb = len(self._data[0])
@@ -319,7 +334,6 @@ class SpreadsheetModel(QAbstractTableModel):
                             for r in self._data:
                                 r.pop(c)
                             self._columnWidths.pop(c)
-                            break
             if row < len(self._data) and col < len(self._data[0]):
                 self._data[row][col] = value
             self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)

@@ -90,13 +90,19 @@ def find_valid_sortings(table):
             match = re.match(r'after\s+([1-9][0-9]*)', entry)
             if match:
                 j = int(match.group(1)) - 1
+                if j >= n or j < 0:
+                    return f"Invalid dependency: {entry} in row {i+1}"
                 dependencies[i].append(j)
                 graph.add_edge(j, i)
             else:
                 match = re.match(r'as far as possible from (\d+)', entry)
                 if match:
                     X = int(match.group(1)) - 1
+                    if X >= n or X < 0:
+                        return f"Invalid optimization term: {entry} in row {i+1}"
                     optimization_terms.append((i, X))
+                else:
+                    return f"Invalid entry: {entry} in row {i+1}"
     
     # Check if the dependency graph is a DAG
     try:
