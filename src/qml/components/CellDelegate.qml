@@ -4,6 +4,7 @@ Rectangle {
     id: cell
     implicitWidth: spreadsheetModel.columnWidth(column)
     implicitHeight: spreadsheetModel.rowHeight(row)
+    color: spreadsheetModel.get_cell_color(row, column)
     border.color: "lightgray"
 
     property int verticalPadding: spreadsheetModel.get_vertical_padding()

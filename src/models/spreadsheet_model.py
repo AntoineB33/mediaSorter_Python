@@ -40,6 +40,7 @@ class SpreadsheetModel(QAbstractTableModel):
         self.checkings_condition = asyncio.Condition()
         self._rows_nb = 0
         self._columns_nb = 0
+        self._errorMsg = ""
         if not Path("data").exists():
             Path("data").mkdir(parents=True, exist_ok=True)
         try:
@@ -54,21 +55,10 @@ class SpreadsheetModel(QAbstractTableModel):
             self._collections = {
                 "collections": {},
             }
+            self.createCollection(self.getDefaultSpreadsheetName())
             self._collectionName = self.getDefaultSpreadsheetName()
             self.checkings_list = []
             self.sortings_list = []
-            self._data = []
-            self._rowHeights = []
-            self._columnWidths = []
-            self._collectionName = self.getDefaultSpreadsheetName()
-            self._collection = {"data": self._data, "rowHeights": self._rowHeights,
-                                "columnWidths": self._columnWidths}
-            self._collections = {
-                "collections": {self._collectionName: self._collection},
-                "collectionName": self._collectionName,
-                "checkings_list": self.checkings_list,
-                "sortings_list": self.sortings_list,
-            }
         self._verticalScrollPosition = 0
         self._verticalScrollSize = 0
         self._tableViewContentY = 0
@@ -134,25 +124,41 @@ class SpreadsheetModel(QAbstractTableModel):
                 data = self._collections["collections"][task[1]]["data"]
                 res = find_valid_sortings(data)
                 if type(res) is str:
+                    self._errorMsg = res
                     self.signal.emit({"type": "FloatingWindow_text_changed", "value": res})
-                elif res != list(range(len(data))):
-                    async with self._data_lock:
-                        if task[1] == self._collectionName:
-                            self.beginResetModel()
-                            self._data = [data[i] for i in res[0]]
-                            for r in self._data:
-                                for c in r:
-                                    match = re.match(r'after\s+([1-9][0-9]*)', c)
-                                    if match:
-                                        j = int(match.group(1)) - 1
-                                        c = re.sub(r'(after\s+)([1-9][0-9]*)', r'\1' + data.index(j), c)
-                                    else:
-                                        match = re.match(r'as far as possible from (\d+)', c)
+                else:
+                    if self._errorMsg:
+                        self._errorMsg = ""
+                        self.signal.emit({"type": "FloatingWindow_text_changed", "value": ""})
+            if task[0] == "sortings":
+                self.ortools_loaded.wait()
+                data = self._collections["collections"][task[1]]["data"]
+                res = find_valid_sortings(data)
+                if type(res) is str:
+                    self._errorMsg = res
+                    self.signal.emit({"type": "FloatingWindow_text_changed", "value": res})
+                else:
+                    if self._errorMsg:
+                        self._errorMsg = ""
+                        self.signal.emit({"type": "FloatingWindow_text_changed", "value": ""})
+                    if res[0] != list(range(len(data))):
+                        async with self._data_lock:
+                            if task[1] == self._collectionName:
+                                self.beginResetModel()
+                                self._data = [data[i] for i in res[0]]
+                                for r in self._data:
+                                    for c in r:
+                                        match = re.match(r'after\s+([1-9][0-9]*)', c)
                                         if match:
-                                            X = int(match.group(1)) - 1
-                                            c = re.sub(r'as far as possible from (\d+)', f'as far as possible from {data.index(X)}', c)
-                            self.endResetModel()
-                            self.save_to_file()
+                                            j = int(match.group(1)) - 1
+                                            c = re.sub(r'(after\s+)([1-9][0-9]*)', r'\1' + data.index(j), c)
+                                        else:
+                                            match = re.match(r'as far as possible from (\d+)', c)
+                                            if match:
+                                                X = int(match.group(1)) - 1
+                                                c = re.sub(r'as far as possible from (\d+)', f'as far as possible from {data.index(X)}', c)
+                                self.endResetModel()
+                                self.save_to_file()
     
     @Slot(result=str)
     def get_font_family(self):
@@ -183,6 +189,12 @@ class SpreadsheetModel(QAbstractTableModel):
             prevHeight = self._rowHeights[row - 1] if row > 0 else 0
             return self._rowHeights[row] - prevHeight
         return self.metrics.height() + self.vertical_padding * 2
+    
+    @Slot(int, int, result=str)
+    def get_cell_color(self, row, column):
+        if row != 0:
+            return "white"
+        elif self.
     
     @Slot(result=str)
     def get_collectionName(self):
@@ -223,7 +235,8 @@ class SpreadsheetModel(QAbstractTableModel):
             self.signal.emit({"type": "input_text_changed", "value": self._collectionName})
         async with self._data_lock:
             self._collections["collections"][name] = {
-                "data": [],
+                "data": [["names"]],
+                "roles": ["names"],
                 "rowHeights": [],
                 "columnWidths": [],
                 "maxRow": 0,
@@ -233,6 +246,7 @@ class SpreadsheetModel(QAbstractTableModel):
             self._collectionName = name
             self._collection = self._collections["collections"][name]
             self._data = self._collection["data"]
+            self._roles = self._collection["roles"]
             self._rowHeights = self._collection["rowHeights"]
             self._columnWidths = self._collection["columnWidths"]
             self.endResetModel()
@@ -243,24 +257,18 @@ class SpreadsheetModel(QAbstractTableModel):
         """Remove a collection by name."""
         if name in self._collections["collections"]:
             async with self._data_lock:
-                self.beginResetModel()
                 del self._collections["collections"][name]
                 if not self._collections["collections"]:
-                    self._collections["collections"] = {
-                        self.getDefaultSpreadsheetName(): {
-                            "data": [],
-                            "rowHeights": [],
-                            "columnWidths": [],
-                            "maxRow": 0,
-                            "maxColumn": 0,
-                        }
-                    }
-                self._collectionName = self._collections["collections"].keys()[0]
-                self._collection = self._collections["collections"][self._collectionName]
-                self._data = self._collection["data"]
-                self._rowHeights = self._collection["rowHeights"]
-                self._columnWidths = self._collection["columnWidths"]
-                self.endResetModel()
+                    self.createCollection(self.getDefaultSpreadsheetName())
+                else:
+                    self.beginResetModel()
+                    self._collectionName = self._collections["collections"].keys()[0]
+                    self._collection = self._collections["collections"][self._collectionName]
+                    self._data = self._collection["data"]
+                    self._roles = self._collection["roles"]
+                    self._rowHeights = self._collection["rowHeights"]
+                    self._columnWidths = self._collection["columnWidths"]
+                    self.endResetModel()
                 self.signal.emit({"type": "input_text_changed", "value": self._collectionName})
                 self.save_to_file()
 
@@ -279,6 +287,7 @@ class SpreadsheetModel(QAbstractTableModel):
             self._collectionName = name
             self._collection = collection
             self._data = self._collection["data"]
+            self._roles = self._collection["roles"]
             self._rowHeights = self._collection["rowHeights"]
             self._columnWidths = self._collection["columnWidths"]
             self.endResetModel()
@@ -328,12 +337,16 @@ class SpreadsheetModel(QAbstractTableModel):
                     for _ in range(prev_col_nb, col + 1):
                         prevWidth = self._columnWidths[-1] if len(self._columnWidths) else 0
                         self._columnWidths.append(prevWidth + self.columnWidth(-1))
+                        self._roles.append("")
                 elif col == len(self._data[0]) - 1 and value == "":
                     for c in range(col - 1, 0, -1):
                         if all(row[c] == "" for row in self._data):
                             for r in self._data:
                                 r.pop(c)
                             self._columnWidths.pop(c)
+                            self._roles.pop(c)
+            else:
+                self._columnWidths = []
             if row < len(self._data) and col < len(self._data[0]):
                 self._data[row][col] = value
             self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
@@ -440,6 +453,7 @@ class SpreadsheetModel(QAbstractTableModel):
         if name not in self._collections["collections"]:
             self._collections["collections"][name] = {
                 "data": self._data,
+                "roles": self._roles,
                 "rowHeights": self._rowHeights,
                 "columnWidths": self._columnWidths,
             }
