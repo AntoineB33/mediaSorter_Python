@@ -194,7 +194,12 @@ class SpreadsheetModel(QAbstractTableModel):
     def get_cell_color(self, row, column):
         if row != 0:
             return "white"
-        elif self.
+        elif self._roles[column] == "names":
+            return "lightblue"
+        elif self._roles[column] == "dependencies":
+            return "lightgreen"
+        elif self._roles[column] == "categories":
+            return "lightyellow"
     
     @Slot(result=str)
     def get_collectionName(self):

@@ -87,7 +87,7 @@ def find_valid_sortings(table, roles):
     
     for i in range(n):
         for i, entry in enumerate(table[i]):
-            if roles[i] == 'dependency':
+            if roles[i] == 'dependencies':
                 match = re.match(r'after\s+([1-9][0-9]*)', entry)
                 if match:
                     j = int(match.group(1)) - 1
