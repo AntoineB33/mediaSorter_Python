@@ -27,7 +27,10 @@ import random
 
 CHECKINGS = "checkings"
 SORTINGS = "sortings"
+SET_DATA = "setData"
 SET_COLLECTION_NAME = "setCollectionName"
+CREATE_COLLECTION = "createCollection"
+DELETE_COLLECTION = "deleteCollection"
 
 class collectionElement:
     def __init__(self):
@@ -101,103 +104,141 @@ class SpreadsheetModel(QAbstractTableModel):
         async with self.checkings_condition:
             type = task_object.type
             collectionName = task_object.collectionName
-            if type == CHECKINGS:
-                for i, task in enumerate(self._collections.checkings_list[1:], start=1):
-                    if task.collectionName == collectionName:
-                        del self._collections.checkings_list[i]
-                        return
-                self._collections.checkings_list.insert(bool(self._collections.checkings_list), task_object)
-                self.save_to_file()
-            elif type == SORTINGS:
-                for i, task in enumerate(self._collections.sortings_list[1:], start=1):
-                    if task.collectionName == collectionName:
-                        del self._collections.sortings_list[i]
-                        return
-                self._collections.sortings_list.insert(bool(self._collections.sortings_list), task_object)
-            elif type == "stop_sorting":
-                if self._collections.sortings_list[0].collectionName == collectionName:
-                    self._collections.sortings_list.insert(1, task_object)
-                else:
+            match type:
+                case CHECKINGS:
+                    for i, task in enumerate(self._collections.checkings_list[1:], start=1):
+                        if task.collectionName == collectionName:
+                            del self._collections.checkings_list[i]
+                            return
+                    self._collections.checkings_list.insert(bool(self._collections.checkings_list), task_object)
+                    self.save_to_file()
+                case SORTINGS:
                     for i, task in enumerate(self._collections.sortings_list[1:], start=1):
                         if task.collectionName == collectionName:
                             del self._collections.sortings_list[i]
                             return
-            elif type == "change_collection":
-                for i, task in enumerate(self._collections.checkings_list[1:], start=1):
-                    if task.collectionName == collectionName:
-                        self._collections.checkings_list.insert(1, task)
-                        del self._collections.checkings_list[i+1]
-                        break
-                for i, task in enumerate(self._collections.sortings_list[1:], start=1):
-                    if task.collectionName == collectionName:
-                        self._collections.sortings_list.insert(1, task)
-                        del self._collections.sortings_list[i+1]
-                        break
-            elif type == "setData":
-                index, value = task_object.index, task_object.value
-                row = index.row()
-                col = index.column()
-                async with self._data_lock:
-                    if row >= len(self._data):
-                        for r in range(len(self._data), row + 1):
-                            prevHeight = self._rowHeights[-1] if self._data else 0
-                            self._rowHeights.append(prevHeight + self.rowHeight(-1))
-                            self._data.append([""] * (len(self._data[0]) if self._data else 0))
-                    elif row == len(self._data) - 1 and value == "":
-                        self._data[row][col] = ""
-                        for r in range(row, -1, -1):
-                            if self._data[r] == [""] * len(self._data[0]):
-                                self._data.pop(r)
-                                self._rowHeights.pop(r)
-                    if self._data:
-                        if col >= len(self._data[0]):
-                            prev_col_nb = len(self._data[0])
-                            for r in self._data:
-                                for _ in range(prev_col_nb, col + 1):
-                                    r.append("")
-                            for j in range(prev_col_nb, col + 1):
-                                prevWidth = self._columnWidths[-1] if len(self._columnWidths) else 0
-                                self._columnWidths.append(prevWidth + self.columnWidth(-1))
-                                self._roles.append("categories")
-                            index = self.index(0, prev_col_nb)
-                            index2 = self.index(0, col)
-                            self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
-                        elif col == len(self._data[0]) - 1 and value == "":
-                            for c in range(col - 1, 0, -1):
-                                if all(row[c] == "" for row in self._data):
-                                    for r in self._data:
-                                        r.pop(c)
-                                    self._columnWidths.pop(c)
-                                    self._roles.pop(c)
+                    self._collections.sortings_list.insert(bool(self._collections.sortings_list), task_object)
+                case "stop_sorting":
+                    if self._collections.sortings_list[0].collectionName == collectionName:
+                        self._collections.sortings_list.insert(1, task_object)
                     else:
-                        self._columnWidths = []
-                    if row < len(self._data) and col < len(self._data[0]):
-                        self._data[row][col] = value
-                    self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
-                    self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
-                    self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
-                    if self._collections.checkings_list[0].collectionName == collectionName:
-                        self._collections.checkings_list[0].id = random.random()
-                    else:
-                        for i, task in enumerate(self._collections.checkings_list):
+                        for i, task in enumerate(self._collections.sortings_list[1:], start=1):
                             if task.collectionName == collectionName:
-                                del self._collections.checkings_list[i]
+                                del self._collections.sortings_list[i]
                                 return
-                        self._collections.checkings_list.insert(bool(self._collections.checkings_list), task_object)
-                    self.save_to_file()
-                    asyncio.create_task(self.add_task(AsyncTask(CHECKINGS, collectionName)))
-            elif type == SET_COLLECTION_NAME:
-                if task[1] in self._collections.collections:
-                    return
-                async with self._data_lock:
-                    self._collections.collections[task[1]] = self._collection
-                    del self._collections.collections[self._collections.collectionName]
-                    for i, task in enumerate(self._collections.checkings_list):
-                        if task[0] == self._collections.collectionName:
-                            self._collections.checkings_list[i][0] = task[1]
+                case "change_collection":
+                    for i, task in enumerate(self._collections.checkings_list[1:], start=1):
+                        if task.collectionName == collectionName:
+                            self._collections.checkings_list.insert(1, task)
+                            del self._collections.checkings_list[i+1]
+                            break
+                    for i, task in enumerate(self._collections.sortings_list[1:], start=1):
+                        if task.collectionName == collectionName:
+                            self._collections.sortings_list.insert(1, task)
+                            del self._collections.sortings_list[i+1]
+                            break
+                case "setData":
+                    index, value = task_object.index, task_object.value
+                    row = index.row()
+                    col = index.column()
+                    async with self._data_lock:
+                        if row >= len(self._data):
+                            for r in range(len(self._data), row + 1):
+                                prevHeight = self._rowHeights[-1] if self._data else 0
+                                self._rowHeights.append(prevHeight + self.rowHeight(-1))
+                                self._data.append([""] * (len(self._data[0]) if self._data else 0))
+                        elif row == len(self._data) - 1 and value == "":
+                            self._data[row][col] = ""
+                            for r in range(row, -1, -1):
+                                if self._data[r] == [""] * len(self._data[0]):
+                                    self._data.pop(r)
+                                    self._rowHeights.pop(r)
+                        if self._data:
+                            if col >= len(self._data[0]):
+                                prev_col_nb = len(self._data[0])
+                                for r in self._data:
+                                    for _ in range(prev_col_nb, col + 1):
+                                        r.append("")
+                                for j in range(prev_col_nb, col + 1):
+                                    prevWidth = self._columnWidths[-1] if len(self._columnWidths) else 0
+                                    self._columnWidths.append(prevWidth + self.columnWidth(-1))
+                                    self._roles.append("categories")
+                                index = self.index(0, prev_col_nb)
+                                index2 = self.index(0, col)
+                                self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
+                            elif col == len(self._data[0]) - 1 and value == "":
+                                for c in range(col - 1, 0, -1):
+                                    if all(row[c] == "" for row in self._data):
+                                        for r in self._data:
+                                            r.pop(c)
+                                        self._columnWidths.pop(c)
+                                        self._roles.pop(c)
+                        else:
+                            self._columnWidths = []
+                        if row < len(self._data) and col < len(self._data[0]):
+                            self._data[row][col] = value
+                        self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
+                        self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
+                        self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
+                        if self._collections.checkings_list[0].collectionName == collectionName:
+                            self._collections.checkings_list[0].id = random.random()
+                        else:
+                            for i, task in enumerate(self._collections.checkings_list):
+                                if task.collectionName == collectionName:
+                                    del self._collections.checkings_list[i]
+                                    return
+                            self._collections.checkings_list.insert(bool(self._collections.checkings_list), task_object)
+                        self.save_to_file()
+                        asyncio.create_task(self.add_task(AsyncTask(CHECKINGS, collectionName)))
+                case SET_COLLECTION_NAME:
+                    async with self._data_lock:
+                        if collectionName in self._collections.collections:
                             return
-                    self._collections.collectionName = task[1]
-                    self.save_to_file()
+                        self._collections.collections[collectionName] = self._collection
+                        del self._collections.collections[self._collections.collectionName]
+                        for i, task in enumerate(self._collections.checkings_list):
+                            if task.collectionName == self._collections.collectionName:
+                                self._collections.checkings_list[i].collectionName = task.collectionName
+                                return
+                        for i, task in enumerate(self._collections.sortings_list):
+                            if task.collectionName == self._collections.collectionName:
+                                self._collections.sortings_list[i].collectionName = task.collectionName
+                                return
+                        self._collections.collectionName = collectionName
+                        self.save_to_file()
+                case CREATE_COLLECTION:
+                    async with self._data_lock:
+                        if collectionName in self._collections.collections:
+                            collectionName = self._getDefaultSpreadsheetName()
+                            self._collections.collectionName = collectionName
+                            self.signal.emit({"type": "input_text_changed", "value": self._collections.collectionName})
+                        self._collections.collections[collectionName] = collectionElement()
+                        self.beginResetModel()
+                        self._collections.collectionName = collectionName
+                        self._collection = self._collections.collections[collectionName]
+                        self._data = self._collection.data
+                        self._roles = self._collection.roles
+                        self._rowHeights = self._collection.rowHeights
+                        self._columnWidths = self._collection.columnWidths
+                        self.endResetModel()
+                        self.save_to_file()
+                case DELETE_COLLECTION:
+                    async with self._data_lock:
+                        if collectionName in self._collections.collections:
+                            del self._collections.collections[collectionName]
+                            if not self._collections.collections:
+                                await self.createCollection(self._getDefaultSpreadsheetName())
+                            else:
+                                self.beginResetModel()
+                                self._collections.collectionName = self._collections.collections.keys()[0]
+                                self._collection = self._collections.collections[self._collections.collectionName]
+                                self._data = self._collection.data
+                                self._roles = self._collection.roles
+                                self._rowHeights = self._collection.rowHeights
+                                self._columnWidths = self._collection.columnWidths
+                                self.endResetModel()
+                            self.signal.emit({"type": "input_text_changed", "value": self._collections.collectionName})
+                            self.save_to_file()
             self.checkings_condition.notify()
 
     def load_ortools_module(self):
@@ -216,10 +257,8 @@ class SpreadsheetModel(QAbstractTableModel):
                 firstIteration = False
                 await self.checkings_condition.wait_for(lambda: len(self._collections.checkings_list) > 0)
                 task = self._collections.checkings_list[0]
-                collectionName = task[0]
-                task_id = task[1]
-            data = self._collections.collections[collectionName].data
-            roles = self._collections.collections[collectionName].roles
+            data = self._collections.collections[task.collectionName].data
+            roles = self._collections.collections[task.collectionName].roles
             res = find_valid_sortings(data, roles)
             if type(res) is str:
                 self._errorMsg = res
@@ -239,8 +278,8 @@ class SpreadsheetModel(QAbstractTableModel):
                 firstIteration = False
                 await self.checkings_condition.wait_for(lambda: len(self._collections.sortings_list) > 0)
                 task = self._collections.sortings_list[0]
-                collectionName = task[0]
-                task_id = task[1]
+                collectionName = task.collectionName
+                task_id = task.id
             data = self._collections.collections[collectionName].data
             roles = self._collections.collections[collectionName].roles
             res = find_valid_sortings(data, roles)
@@ -262,7 +301,7 @@ class SpreadsheetModel(QAbstractTableModel):
                     except ValueError:
                         pass
                     if res[0] != list(range(len(data))):
-                        if task[1] == self._collections.collectionName:
+                        if collectionName == self._collections.collectionName:
                             self.beginResetModel()
                             self._data = [data[i] for i in res[0]]
                             for r in self._data:
@@ -347,42 +386,11 @@ class SpreadsheetModel(QAbstractTableModel):
 
     @asyncSlot(str)
     async def createCollection(self, name):
-        """Create a new collection with the given name."""
-        if name in self._collections.collections:
-            name = self._getDefaultSpreadsheetName()
-            self._collections.collectionName = name
-            self.signal.emit({"type": "input_text_changed", "value": self._collections.collectionName})
-        async with self._data_lock:
-            self._collections.collections[name] = collectionElement()
-            self.beginResetModel()
-            self._collections.collectionName = name
-            self._collection = self._collections.collections[name]
-            self._data = self._collection.data
-            self._roles = self._collection.roles
-            self._rowHeights = self._collection.rowHeights
-            self._columnWidths = self._collection.columnWidths
-            self.endResetModel()
-            self.save_to_file()
+        asyncio.create_task(self.add_task(AsyncTask(CREATE_COLLECTION, name=name)))
 
     @asyncSlot(str)
     async def deleteCollection(self, name):
-        """Remove a collection by name."""
-        if name in self._collections.collections:
-            async with self._data_lock:
-                del self._collections.collections[name]
-                if not self._collections.collections:
-                    await self.createCollection(self._getDefaultSpreadsheetName())
-                else:
-                    self.beginResetModel()
-                    self._collections.collectionName = self._collections.collections.keys()[0]
-                    self._collection = self._collections.collections[self._collections.collectionName]
-                    self._data = self._collection.data
-                    self._roles = self._collection.roles
-                    self._rowHeights = self._collection.rowHeights
-                    self._columnWidths = self._collection.columnWidths
-                    self.endResetModel()
-                self.signal.emit({"type": "input_text_changed", "value": self._collections.collectionName})
-                self.save_to_file()
+        asyncio.create_task(self.add_task(AsyncTask(DELETE_COLLECTION, name=name)))
 
     @Slot(str)
     async def pressEnterOnInput(self, name):
@@ -428,7 +436,7 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         if role == Qt.EditRole and index.isValid():
-            asyncio.create_task(self.add_task(["setData", index, value]))
+            asyncio.create_task(self.add_task(AsyncTask(SET_DATA, index=index, value=value)))
             return True
         return False
 
@@ -544,7 +552,7 @@ class SpreadsheetModel(QAbstractTableModel):
     
     @Slot(bool)
     def sortButton(self, onlyCalculate):
-        asyncio.create_task(self.add_task({"type": SORTINGS, "value": {"collectionName": self._collections.collectionName, "onlyCalculate": onlyCalculate}}))
+        asyncio.create_task(self.add_task(AsyncTask(SORTINGS, self._collections.collectionName, onlyCalculate=onlyCalculate)))
     
     @Slot(int, str)
     def setColumnRole(self, column, role):
