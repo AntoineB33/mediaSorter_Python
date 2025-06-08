@@ -5,7 +5,11 @@ Rectangle {
     implicitWidth: spreadsheetModel.columnWidth(column)
     implicitHeight: spreadsheetModel.rowHeight(row)
     color: spreadsheetModel.get_cell_color(row, column)
-    border.color: "lightgray"
+    border {
+        color: cell.activeFocus ? "black" : "lightgray"
+        // Increase border width for focused cells
+        width: cell.activeFocus ? 3 : 1
+    }
 
     property int verticalPadding: spreadsheetModel.get_vertical_padding()
     property font cellFont: Qt.font({
@@ -68,9 +72,11 @@ Rectangle {
     MouseArea {
         anchors.fill: parent
         onClicked: {
+            cell.forceActiveFocus()
             cell.editing = true
-            cell.editText = cell.display  // Initialize editText with current value
+            cell.editText = cell.display
             editor.forceActiveFocus()
+            floatingWindow.currentColumn = column
         }
     }
 }

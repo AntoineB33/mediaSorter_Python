@@ -8,11 +8,13 @@ Rectangle {
     property var recommendations: []
     property alias errorTextItem: errorText
     width: 300
-    height: 200
+    height: 500
     color: "lightblue"
     x: tableView.x + 10
     y: tableView.y + 10
     z: 1
+    property int currentColumn: -1
+    property var roleOptions: ["names", "dependencies", "categories"]
 
     // Drag handling
     MouseArea {
@@ -225,6 +227,13 @@ Rectangle {
             }
         }
 
+        Text {
+            id: errorCollectionName
+            text: ""
+            color: "red"
+            visible: text.length > 0
+        }
+
         // Buttons
         RowLayout {
             spacing: 10
@@ -232,11 +241,24 @@ Rectangle {
 
             Button {
                 text: "Sort"
-                onClicked: spreadsheetModel.sortButton()
+                onClicked: spreadsheetModel.sortButton(false)
             }
 
             Button {
-                text: "Button 2"
+                text: "Calculate"
+                onClicked: spreadsheetModel.sortButton(true)
+            }
+        }
+    
+        ComboBox {
+            id: roleComboBox
+            model: floatingWindow.roleOptions
+            width: 150
+            
+            onActivated: (index) => {
+                if (floatingWindow.currentColumn >= 0) {
+                    spreadsheetModel.setColumnRole(floatingWindow.currentColumn, model[index])
+                }
             }
         }
 
@@ -244,6 +266,7 @@ Rectangle {
             id: errorText
             text: ""
             color: "red"
+            visible: text.length > 0
         }
     }
 }

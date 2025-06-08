@@ -19,6 +19,7 @@ async def main():
     asyncio.set_event_loop(loop)
 
     model = SpreadsheetModel()
+    await model.initialize()
     
     engine = QQmlApplicationEngine()
     
@@ -43,7 +44,7 @@ async def main():
         sys.exit(-1)
     
     # Connect save handler
-    app.aboutToQuit.connect(model.save_to_file)
+    # app.aboutToQuit.connect(model.save_to_file)
 
     with loop:
         sys.exit(loop.run_forever())
