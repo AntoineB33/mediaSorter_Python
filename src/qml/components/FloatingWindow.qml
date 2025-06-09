@@ -10,8 +10,8 @@ Rectangle {
     width: 300
     height: 500
     color: "lightblue"
-    x: tableView.x + 10
-    y: tableView.y + 10
+    x: mainWindow.width - floatingWindow.width - tableView.ScrollBar.vertical.width
+    y: 0
     z: 1
     property int currentColumn: -1
     property var roleOptions: ["names", "dependencies", "categories"]

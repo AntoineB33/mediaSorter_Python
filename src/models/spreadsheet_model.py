@@ -24,20 +24,28 @@ from asyncio import get_event_loop
 from collections import deque
 import re
 import random
+import pickle
+from concurrent.futures import ThreadPoolExecutor
 
-CHECKINGS = "checkings"
-SORTINGS = "sortings"
-SET_DATA = "setData"
-SET_COLLECTION_NAME = "setCollectionName"
-CREATE_COLLECTION = "createCollection"
-DELETE_COLLECTION = "deleteCollection"
+
+SAVE_FILE = "data/general.json"
+
+class TaskTypes:
+    CHECKINGS = "checkings"
+    SORTINGS = "sortings"
+    STOP_SORTING = "stop_sorting"
+    CHANGE_COLLECTION = "change_collection"
+    SET_DATA = "setData"
+    SET_COLLECTION_NAME = "setCollectionName"
+    CREATE_COLLECTION = "createCollection"
+    DELETE_COLLECTION = "deleteCollection"
 
 class collectionElement:
-    def __init__(self):
+    def __init__(self, rowHeights, columnWidths):
         self.data = [["names"]]
         self.roles = ["names"]
-        self.rowHeights = [self.rowHeight(-1)]
-        self.columnWidths = [self.columnWidth(-1)]
+        self.rowHeights = rowHeights
+        self.columnWidths = columnWidths
 
 class collection:
     def __init__(self):
@@ -47,10 +55,11 @@ class collection:
         self.collectionName = ""
 
 class AsyncTask:
-    def __init__(self, task_type, collectionName = None, index = None, value = None, onlyCalculate=False):
+    def __init__(self, task_type, collectionName = None, row = None, column = None, value = None, onlyCalculate=False):
         self.task_type = task_type
         self.collectionName = collectionName
-        self.index = index
+        self.row = row
+        self.column = column
         self.value = value
         self.onlyCalculate = onlyCalculate
         self.id = random.random()
@@ -68,7 +77,7 @@ class SpreadsheetModel(QAbstractTableModel):
         self.font = QFont("Arial", 10)
 
         self.metrics = QFontMetrics(self.font)
-        self.checkings_condition = asyncio.Condition()
+        self.condition = threading.Condition()
         self._rows_nb = 0
         self._columns_nb = 0
         self._errorMsg = ""
@@ -81,13 +90,14 @@ class SpreadsheetModel(QAbstractTableModel):
         self._tableViewContentX = 0
         self._tableViewWidth = 0
         self._data_lock = asyncio.Lock()
+        self._executor = ThreadPoolExecutor(max_workers=2)
             
     async def initialize(self):
         if not Path("data").exists():
             Path("data").mkdir(parents=True, exist_ok=True)
         try:
-            with open(f"data/general.json", "r") as f:
-                collections = json.load(f)
+            with open(SAVE_FILE, "rb") as f:
+                collections = pickle.load(f)
             if collections:
                 self._collections = collections
                 self.loadSpreadsheet(collections.collectionName)
@@ -95,30 +105,34 @@ class SpreadsheetModel(QAbstractTableModel):
             self._collections = collection()
             self._collections.collectionName = self._getDefaultSpreadsheetName()
             await self.createCollection(self._collections.collectionName)
+        self._executor.submit(self.run_async, self.checkings_thread)
+        self._executor.submit(self.run_async, self.sortings_thread)
 
-    def _start_async_tasks(self):
-        asyncio.create_task(self.checkings_worker())
-        asyncio.create_task(self.sortings_worker())
+    def run_async(self, coro_func):
+        """Helper to run coroutines in a new event loop per thread"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(coro_func())
 
     async def add_task(self, task_object):
-        async with self.checkings_condition:
-            type = task_object.type
+        with self.condition:
+            task_type = task_object.task_type
             collectionName = task_object.collectionName
-            match type:
-                case CHECKINGS:
+            match task_type:
+                case TaskTypes.CHECKINGS:
                     for i, task in enumerate(self._collections.checkings_list[1:], start=1):
                         if task.collectionName == collectionName:
                             del self._collections.checkings_list[i]
                             return
                     self._collections.checkings_list.insert(bool(self._collections.checkings_list), task_object)
                     self.save_to_file()
-                case SORTINGS:
+                case TaskTypes.SORTINGS:
                     for i, task in enumerate(self._collections.sortings_list[1:], start=1):
                         if task.collectionName == collectionName:
                             del self._collections.sortings_list[i]
                             return
                     self._collections.sortings_list.insert(bool(self._collections.sortings_list), task_object)
-                case "stop_sorting":
+                case TaskTypes.STOP_SORTING:
                     if self._collections.sortings_list[0].collectionName == collectionName:
                         self._collections.sortings_list.insert(1, task_object)
                     else:
@@ -126,7 +140,7 @@ class SpreadsheetModel(QAbstractTableModel):
                             if task.collectionName == collectionName:
                                 del self._collections.sortings_list[i]
                                 return
-                case "change_collection":
+                case TaskTypes.CHANGE_COLLECTION:
                     for i, task in enumerate(self._collections.checkings_list[1:], start=1):
                         if task.collectionName == collectionName:
                             self._collections.checkings_list.insert(1, task)
@@ -137,10 +151,8 @@ class SpreadsheetModel(QAbstractTableModel):
                             self._collections.sortings_list.insert(1, task)
                             del self._collections.sortings_list[i+1]
                             break
-                case "setData":
-                    index, value = task_object.index, task_object.value
-                    row = index.row()
-                    col = index.column()
+                case TaskTypes.SET_DATA:
+                    row, col, value = task_object.row, task_object.column, task_object.value
                     async with self._data_lock:
                         if row >= len(self._data):
                             for r in range(len(self._data), row + 1):
@@ -164,7 +176,7 @@ class SpreadsheetModel(QAbstractTableModel):
                                     self._columnWidths.append(prevWidth + self.columnWidth(-1))
                                     self._roles.append("categories")
                                 index = self.index(0, prev_col_nb)
-                                index2 = self.index(0, col)
+                                index2 = self.index(0, col + 1)
                                 self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
                             elif col == len(self._data[0]) - 1 and value == "":
                                 for c in range(col - 1, 0, -1):
@@ -180,7 +192,7 @@ class SpreadsheetModel(QAbstractTableModel):
                         self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
                         self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
                         self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
-                        if self._collections.checkings_list[0].collectionName == collectionName:
+                        if self._collections.checkings_list and self._collections.checkings_list[0].collectionName == collectionName:
                             self._collections.checkings_list[0].id = random.random()
                         else:
                             for i, task in enumerate(self._collections.checkings_list):
@@ -189,8 +201,8 @@ class SpreadsheetModel(QAbstractTableModel):
                                     return
                             self._collections.checkings_list.insert(bool(self._collections.checkings_list), task_object)
                         self.save_to_file()
-                        asyncio.create_task(self.add_task(AsyncTask(CHECKINGS, collectionName)))
-                case SET_COLLECTION_NAME:
+                        asyncio.create_task(self.add_task(AsyncTask(TaskTypes.CHECKINGS, collectionName)))
+                case TaskTypes.SET_COLLECTION_NAME:
                     async with self._data_lock:
                         if collectionName in self._collections.collections:
                             return
@@ -206,13 +218,13 @@ class SpreadsheetModel(QAbstractTableModel):
                                 return
                         self._collections.collectionName = collectionName
                         self.save_to_file()
-                case CREATE_COLLECTION:
+                case TaskTypes.CREATE_COLLECTION:
                     async with self._data_lock:
                         if collectionName in self._collections.collections:
                             collectionName = self._getDefaultSpreadsheetName()
                             self._collections.collectionName = collectionName
                             self.signal.emit({"type": "input_text_changed", "value": self._collections.collectionName})
-                        self._collections.collections[collectionName] = collectionElement()
+                        self._collections.collections[collectionName] = collectionElement([self.rowHeight(-1)], [self.columnWidth(-1)])
                         self.beginResetModel()
                         self._collections.collectionName = collectionName
                         self._collection = self._collections.collections[collectionName]
@@ -222,7 +234,7 @@ class SpreadsheetModel(QAbstractTableModel):
                         self._columnWidths = self._collection.columnWidths
                         self.endResetModel()
                         self.save_to_file()
-                case DELETE_COLLECTION:
+                case TaskTypes.DELETE_COLLECTION:
                     async with self._data_lock:
                         if collectionName in self._collections.collections:
                             del self._collections.collections[collectionName]
@@ -239,23 +251,21 @@ class SpreadsheetModel(QAbstractTableModel):
                                 self.endResetModel()
                             self.signal.emit({"type": "input_text_changed", "value": self._collections.collectionName})
                             self.save_to_file()
-            self.checkings_condition.notify()
-
-    def load_ortools_module(self):
+            self.condition.notify_all()
+     
+    async def checkings_thread(self):
         global find_valid_sortings
         from models.generate_sortings import find_valid_sortings
-        
-    async def checkings_worker(self):
-        print("Task worker started")
-        await asyncio.to_thread(self.load_ortools_module)
         self.ortools_loaded.set()
         firstIteration = True
         while True:
-            async with self.checkings_condition:
+            task = None
+            with self.condition:
                 if not firstIteration:
                     del self._collections.checkings_list[0]
                 firstIteration = False
-                await self.checkings_condition.wait_for(lambda: len(self._collections.checkings_list) > 0)
+                while not self._collections.checkings_list:
+                    self.condition.wait()
                 task = self._collections.checkings_list[0]
             data = self._collections.collections[task.collectionName].data
             roles = self._collections.collections[task.collectionName].roles
@@ -268,15 +278,16 @@ class SpreadsheetModel(QAbstractTableModel):
                     self._errorMsg = ""
                     self.signal.emit({"type": "FloatingWindow_text_changed", "value": ""})
     
-    async def sortings_worker(self):
+    async def sortings_thread(self):
         self.ortools_loaded.wait()
         firstIteration = True
         while True:
-            async with self.checkings_condition:
+            with self.condition:
                 if not firstIteration:
-                    del self._collections.sortings_list[0]
+                    del self._collections.checkings_list[0]
                 firstIteration = False
-                await self.checkings_condition.wait_for(lambda: len(self._collections.sortings_list) > 0)
+                while not self._collections.checkings_list:
+                    self.condition.wait()
                 task = self._collections.sortings_list[0]
                 collectionName = task.collectionName
                 task_id = task.id
@@ -382,15 +393,15 @@ class SpreadsheetModel(QAbstractTableModel):
 
     @asyncSlot(str)
     async def setSpreadsheetName(self, name):
-        asyncio.create_task(self.add_task(AsyncTask(SET_COLLECTION_NAME, name=name)))
+        asyncio.create_task(self.add_task(AsyncTask(TaskTypes.SET_COLLECTION_NAME, collectionName=name)))
 
     @asyncSlot(str)
     async def createCollection(self, name):
-        asyncio.create_task(self.add_task(AsyncTask(CREATE_COLLECTION, name=name)))
+        asyncio.create_task(self.add_task(AsyncTask(TaskTypes.CREATE_COLLECTION, collectionName=name)))
 
     @asyncSlot(str)
     async def deleteCollection(self, name):
-        asyncio.create_task(self.add_task(AsyncTask(DELETE_COLLECTION, name=name)))
+        asyncio.create_task(self.add_task(AsyncTask(TaskTypes.DELETE_COLLECTION, collectionName=name)))
 
     @Slot(str)
     async def pressEnterOnInput(self, name):
@@ -436,7 +447,7 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         if role == Qt.EditRole and index.isValid():
-            asyncio.create_task(self.add_task(AsyncTask(SET_DATA, index=index, value=value)))
+            asyncio.create_task(self.add_task(AsyncTask(TaskTypes.SET_DATA, row = index.row(), column = index.column(), value=value)))
             return True
         return False
 
@@ -547,12 +558,12 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def save_to_file(self):
         """Save model data to a JSON file."""
-        with open(f"data/general.json", "w") as f:
-            json.dump(self._collections, f)
+        with open(SAVE_FILE, "wb") as f:
+            pickle.dump(self._collections, f)
     
     @Slot(bool)
     def sortButton(self, onlyCalculate):
-        asyncio.create_task(self.add_task(AsyncTask(SORTINGS, self._collections.collectionName, onlyCalculate=onlyCalculate)))
+        asyncio.create_task(self.add_task(AsyncTask(TaskTypes.SORTINGS, self._collections.collectionName, onlyCalculate=onlyCalculate)))
     
     @Slot(int, str)
     def setColumnRole(self, column, role):
@@ -562,4 +573,4 @@ class SpreadsheetModel(QAbstractTableModel):
             # Notify views that header row (row 0) needs to update
             index = self.index(0, column)
             self.dataChanged.emit(index, index, [Qt.DisplayRole])
-        asyncio.create_task(self.add_task(AsyncTask(CHECKINGS, self._collections.collectionName)))
+        asyncio.create_task(self.add_task(AsyncTask(TaskTypes.CHECKINGS, self._collections.collectionName)))

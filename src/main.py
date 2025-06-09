@@ -26,9 +26,6 @@ async def main():
     # 1. Set context property FIRST
     engine.rootContext().setContextProperty("spreadsheetModel", model)
 
-    from PySide6.QtCore import QTimer
-    QTimer.singleShot(0, model._start_async_tasks)
-
     
     # 2. Configure paths AFTER setting context
     current_dir = Path(__file__).parent
