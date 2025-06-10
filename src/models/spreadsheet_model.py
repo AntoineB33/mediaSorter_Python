@@ -176,21 +176,29 @@ class SpreadsheetModel(QAbstractTableModel):
                                     self._columnWidths.append(prevWidth + self.columnWidth(-1))
                                     self._roles.append("categories")
                                 index = self.index(0, prev_col_nb)
-                                index2 = self.index(0, col + 1)
+                                index2 = self.index(0, col)
                                 self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
                             elif col == len(self._data[0]) - 1 and value == "":
-                                for c in range(col - 1, 0, -1):
-                                    if all(row[c] == "" for row in self._data):
+                                for c in range(col, -1, -1):
+                                    if all(_row[c] == "" for _row in self._data):
                                         for r in self._data:
                                             r.pop(c)
                                         self._columnWidths.pop(c)
                                         self._roles.pop(c)
-                        else:
+                                index = self.index(0, len(self._data[0]))
+                                index2 = self.index(0, col)
+                                self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
+                        elif self._roles:
                             self._columnWidths = []
+                            index = self.index(0, 0)
+                            index2 = self.index(0, len(self._roles))
+                            self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
+                            self._roles = []
                         if row < len(self._data) and col < len(self._data[0]):
                             self._data[row][col] = value
                         self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
                         self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
+                        index = self.index(row, col)
                         self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
                         if self._collections.checkings_list and self._collections.checkings_list[0].collectionName == collectionName:
                             self._collections.checkings_list[0].id = random.random()
@@ -436,6 +444,7 @@ class SpreadsheetModel(QAbstractTableModel):
         return self._columns_nb
 
     def data(self, index, role=Qt.DisplayRole):
+        print(f"Requested role: {role}")
         if role == Qt.DisplayRole and index.isValid():
             if index.row() < len(self._data) and index.column() < (len(self._data[0]) if self._data else 0):
                 return self._data[index.row()][index.column()]
