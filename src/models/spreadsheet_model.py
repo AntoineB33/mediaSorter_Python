@@ -29,6 +29,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 SAVE_FILE = "data/general.json"
+MEDIA_ROOT = "data/media"
 
 class TaskTypes:
     CHECKINGS = "checkings"
@@ -174,7 +175,7 @@ class SpreadsheetModel(QAbstractTableModel):
                                 for j in range(prev_col_nb, col + 1):
                                     prevWidth = self._columnWidths[-1] if len(self._columnWidths) else 0
                                     self._columnWidths.append(prevWidth + self.columnWidth(-1))
-                                    self._roles.append("categories")
+                                    self._roles.append("attributes")
                                 index = self.index(0, prev_col_nb)
                                 index2 = self.index(0, col)
                                 self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
@@ -380,8 +381,12 @@ class SpreadsheetModel(QAbstractTableModel):
             return "lightblue"
         elif self._roles[column] == "dependencies":
             return "lightgreen"
-        elif self._roles[column] == "categories":
+        elif self._roles[column] == "attributes":
             return "lightyellow"
+        elif self._roles[column] == "urls":
+            return "lightcoral"
+        elif self._roles[column] == "view":
+            return "lightgray"
     
     @Slot(result=str)
     def get_collectionName(self):

@@ -79,4 +79,25 @@ Rectangle {
             floatingWindow.currentColumn = column
         }
     }
+    
+    // Add connection to handle background updates
+    Connections {
+        target: spreadsheetModel
+        function onDataChanged(topLeft, bottomRight, roles) {
+            if (topLeft.row <= 0 && bottomRight.row >= 0 && 
+                topLeft.column <= column && bottomRight.column >= column) {
+                // Update the display property
+                if (row == 0) {
+                    cellDelegate.display = spreadsheetModel.data(
+                        spreadsheetModel.index(row, column), 
+                        Qt.DisplayRole
+                    )
+                }
+                // Update background if BackgroundRole changed
+                if (roles.includes(Qt.BackgroundRole)) {
+                    color = spreadsheetModel.get_cell_color(row, column)
+                }
+            }
+        }
+    }
 }
