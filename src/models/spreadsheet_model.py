@@ -385,8 +385,6 @@ class SpreadsheetModel(QAbstractTableModel):
             return "lightyellow"
         elif self._roles[column] == "urls":
             return "lightcoral"
-        elif self._roles[column] == "view":
-            return "lightgray"
     
     @Slot(result=str)
     def get_collectionName(self):

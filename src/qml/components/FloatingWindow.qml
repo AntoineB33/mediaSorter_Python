@@ -14,7 +14,7 @@ Rectangle {
     y: 0
     z: 1
     property int currentColumn: -1
-    property var roleOptions: ["names", "dependencies", "attributes", "path", "view"]
+    property var roleOptions: ["names", "dependencies", "attributes", "path"]
 
     // Drag handling
     MouseArea {
