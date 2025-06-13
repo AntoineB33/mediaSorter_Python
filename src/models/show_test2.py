@@ -119,7 +119,7 @@ def main(media_paths):
                     # Release current video if playing
                     if media_list[current_index]['type'] == 'video':
                         media_list[current_index]['data']['cap'].release()
-                    current_index = min(current_index + 1, len(media_list))
+                    current_index = min(current_index + 1, len(media_list) - 1)
                 elif event.key == pygame.K_LEFT:
                     # Release current video if playing
                     if media_list[current_index]['type'] == 'video':
@@ -133,16 +133,16 @@ def main(media_paths):
                 elif event.key in [pygame.K_SPACE, pygame.K_k]:  # Pause/Play with space or k
                     if media_list[current_index]['type'] == 'video':
                         media_list[current_index]['data']['paused'] = not media_list[current_index]['data']['paused']
-                elif event.key == pygame.K_6:  # Move forward 5 seconds
+                elif event.key in [pygame.K_6, pygame.K_KP6]:  # Move forward 5 seconds
                     if media_list[current_index]['type'] == 'video':
-                        vid = media_list[current_index]['data']['data']
+                        vid = media_list[current_index]['data']
                         current_frame = vid['cap'].get(cv2.CAP_PROP_POS_FRAMES)
                         new_frame = min(vid['frame_count'] - 1, current_frame + 5 * vid['fps'])
                         vid['cap'].set(cv2.CAP_PROP_POS_FRAMES, new_frame)
                         vid['position'] = new_frame
-                elif event.key == pygame.K_4:  # Move backward 5 seconds
+                elif event.key in [pygame.K_4, pygame.K_KP4]:  # Move backward 5 seconds
                     if media_list[current_index]['type'] == 'video':
-                        vid = media_list[current_index]['data']['data']
+                        vid = media_list[current_index]['data']
                         current_frame = vid['cap'].get(cv2.CAP_PROP_POS_FRAMES)
                         new_frame = max(0, current_frame - 5 * vid['fps'])
                         vid['cap'].set(cv2.CAP_PROP_POS_FRAMES, new_frame)
