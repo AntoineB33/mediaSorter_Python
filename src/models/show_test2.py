@@ -119,21 +119,34 @@ def main(media_paths):
                     # Release current video if playing
                     if media_list[current_index]['type'] == 'video':
                         media_list[current_index]['data']['cap'].release()
-                    current_index = (current_index + 1) % len(media_list)
+                    current_index = min(current_index + 1, len(media_list))
                 elif event.key == pygame.K_LEFT:
                     # Release current video if playing
                     if media_list[current_index]['type'] == 'video':
                         media_list[current_index]['data']['cap'].release()
-                    current_index = (current_index - 1) % len(media_list)
+                    current_index = max(current_index - 1, 0)
                 elif event.key == pygame.K_f:  # Toggle fullscreen
                     if screen.get_flags() & pygame.FULLSCREEN:
                         pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
                     else:
                         pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
-                elif event.key == pygame.K_SPACE:
-                    # Toggle video pause/play
+                elif event.key in [pygame.K_SPACE, pygame.K_k]:  # Pause/Play with space or k
                     if media_list[current_index]['type'] == 'video':
                         media_list[current_index]['data']['paused'] = not media_list[current_index]['data']['paused']
+                elif event.key == pygame.K_6:  # Move forward 5 seconds
+                    if media_list[current_index]['type'] == 'video':
+                        vid = media_list[current_index]['data']['data']
+                        current_frame = vid['cap'].get(cv2.CAP_PROP_POS_FRAMES)
+                        new_frame = min(vid['frame_count'] - 1, current_frame + 5 * vid['fps'])
+                        vid['cap'].set(cv2.CAP_PROP_POS_FRAMES, new_frame)
+                        vid['position'] = new_frame
+                elif event.key == pygame.K_4:  # Move backward 5 seconds
+                    if media_list[current_index]['type'] == 'video':
+                        vid = media_list[current_index]['data']['data']
+                        current_frame = vid['cap'].get(cv2.CAP_PROP_POS_FRAMES)
+                        new_frame = max(0, current_frame - 5 * vid['fps'])
+                        vid['cap'].set(cv2.CAP_PROP_POS_FRAMES, new_frame)
+                        vid['position'] = new_frame
         
         # Clear screen
         screen.fill((0, 0, 0))
@@ -201,7 +214,7 @@ def main(media_paths):
         
         # Display help
         help_font = pygame.font.SysFont(None, 24)
-        help_text = help_font.render("← →: Navigate  SPACE: Play/Pause  F: Fullscreen  ESC: Quit", True, (200, 200, 200))
+        help_text = help_font.render("← →: Navigate  K: Play/Pause  4/6: Seek ±5s  F: Fullscreen  ESC: Quit", True, (200, 200, 200))
         screen.blit(help_text, (screen_width // 2 - help_text.get_width() // 2, screen_height - 40))
         
         pygame.display.flip()
