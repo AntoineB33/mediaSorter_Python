@@ -1,5 +1,7 @@
 networkx==3.4.2
+numpy==2.3.0
 ortools==9.12.4544
 pygame==2.6.1
 PySide6==6.9.1
 qasync==0.27.1
+opencv-python
