@@ -5,11 +5,8 @@ Rectangle {
     implicitWidth: spreadsheetModel.columnWidth(column)
     implicitHeight: spreadsheetModel.rowHeight(row)
     color: spreadsheetModel.get_cell_color(row, column)
-    border {
-        color: cell.activeFocus ? "black" : "lightgray"
-        // Increase border width for focused cells
-        width: cell.activeFocus ? 3 : 1
-    }
+    border.color: "lightgray"
+    border.width: 1
 
     property int verticalPadding: spreadsheetModel.get_vertical_padding()
     property font cellFont: Qt.font({
@@ -23,6 +20,9 @@ Rectangle {
     required property string display
     property bool editing: false
     property string editText: ""  // Added to track edited text
+
+    property int selectedRow: -1
+    property int selectedColumn: -1
 
     Text {
         anchors.fill: parent
@@ -49,6 +49,8 @@ Rectangle {
         function finishEditing() {
             cell.editing = false
             editor.focus = false
+            cell.border.color = "lightgray"
+            cell.border.width = 1
         }
 
         Keys.onPressed: (event) => {
@@ -75,6 +77,10 @@ Rectangle {
             cell.forceActiveFocus()
             cell.editing = true
             cell.editText = cell.display
+            cell.border.color = "black"
+            cell.border.width = 3
+            cell.selectedRow = row
+            cell.selectedColumn = column
             editor.forceActiveFocus()
             floatingWindow.currentColumn = column
         }
