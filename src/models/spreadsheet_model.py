@@ -677,6 +677,8 @@ class SpreadsheetModel(QAbstractTableModel):
     def showButton(self):
         url_col = self._roles.index("urls") if "urls" in self._roles else -1
         if url_col != -1:
+            if not os.path.exists(MEDIA_ROOT):
+                os.makedirs(MEDIA_ROOT)
             self.main_show([
                 os.path.join(MEDIA_ROOT, self._data[i][url_col])
                 for i in range(len(self._data))

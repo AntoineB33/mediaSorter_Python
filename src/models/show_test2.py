@@ -58,9 +58,9 @@ def main(image_paths):
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_RIGHT:
-                    current_index = (current_index + 1) % len(scaled_images)
+                    current_index = min(len(scaled_images) - 1, current_index + 1)
                 elif event.key == pygame.K_LEFT:
-                    current_index = (current_index - 1) % len(scaled_images)
+                    current_index = max(0, current_index - 1)
                 elif event.key == pygame.K_f:  # Toggle true fullscreen with F key
                     if screen.get_flags() & pygame.FULLSCREEN:
                         pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
