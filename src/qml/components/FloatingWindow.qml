@@ -249,6 +249,22 @@ Rectangle {
                 onClicked: spreadsheetModel.sortButton(true)
             }
         }
+
+        // Buttons
+        RowLayout {
+            spacing: 10
+            Layout.alignment: Qt.AlignHCenter
+
+            Button {
+                text: "View"
+                onClicked: spreadsheetModel.viewButton(false)
+            }
+
+            Button {
+                text: "Show"
+                onClicked: spreadsheetModel.showButton(true)
+            }
+        }
     
         ComboBox {
             id: roleComboBox

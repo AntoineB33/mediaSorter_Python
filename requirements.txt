@@ -1,3 +1,5 @@
 networkx==3.4.2
 ortools==9.12.4544
-PySide6==6.9.0
+pygame==2.6.1
+PySide6==6.9.1
+qasync==0.27.1
