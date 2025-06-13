@@ -116,15 +116,17 @@ def main(media_paths):
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_RIGHT:
-                    # Release current video if playing
-                    if media_list[current_index]['type'] == 'video':
-                        media_list[current_index]['data']['cap'].release()
-                    current_index = min(current_index + 1, len(media_list) - 1)
+                    if current_index < len(media_list) - 1:
+                        # Release current video only if we're moving to a new media item
+                        if media_list[current_index]['type'] == 'video':
+                            media_list[current_index]['data']['cap'].release()
+                        current_index += 1
                 elif event.key == pygame.K_LEFT:
-                    # Release current video if playing
-                    if media_list[current_index]['type'] == 'video':
-                        media_list[current_index]['data']['cap'].release()
-                    current_index = max(current_index - 1, 0)
+                    if current_index > 0:
+                        # Release current video only if we're moving to a new media item
+                        if media_list[current_index]['type'] == 'video':
+                            media_list[current_index]['data']['cap'].release()
+                        current_index -= 1
                 elif event.key == pygame.K_f:  # Toggle fullscreen
                     if screen.get_flags() & pygame.FULLSCREEN:
                         pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
