@@ -21,8 +21,6 @@ Rectangle {
     property bool editing: false
     property string editText: ""  // Added to track edited text
 
-    property int selectedRow: -1
-    property int selectedColumn: -1
 
     Text {
         anchors.fill: parent
@@ -49,8 +47,6 @@ Rectangle {
         function finishEditing() {
             cell.editing = false
             editor.focus = false
-            cell.border.color = "lightgray"
-            cell.border.width = 1
         }
 
         Keys.onPressed: (event) => {
@@ -79,8 +75,7 @@ Rectangle {
             cell.editText = cell.display
             cell.border.color = "black"
             cell.border.width = 3
-            cell.selectedRow = row
-            cell.selectedColumn = column
+            spreadsheetModel.cellClicked(row, column)
             editor.forceActiveFocus()
             floatingWindow.currentColumn = column
         }
@@ -102,6 +97,15 @@ Rectangle {
                 // Update background if BackgroundRole changed
                 if (roles.includes(Qt.BackgroundRole)) {
                     color = spreadsheetModel.get_cell_color(row, column)
+                }
+                if (roles.includes(Qt.DecorationRole)) {
+                    var decoration = spreadsheetModel.data(
+                        spreadsheetModel.index(row, column), 
+                        Qt.DecorationRole
+                    );
+                    cell.border.color = decoration == 0 ? "lightgray" : 
+                        decoration == 2 ? "black" : "lightgreen";
+                    cell.border.width = decoration == 2 ? 3 : 1;
                 }
             }
         }

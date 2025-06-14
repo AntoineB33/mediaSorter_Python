@@ -32,6 +32,10 @@ Window {
                 case "FloatingWindow_text_changed":
                     floatingWindow.errorTextItem.text = data.value;
                     break;
+                case "selected_cell_changed":
+                    selectedRow = data.row;
+                    selectedColumn = data.column;
+                    break;
                 default:
                     console.warn("Unknown signal type:", data.type);
             }

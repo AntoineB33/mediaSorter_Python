@@ -27,7 +27,9 @@ import random
 import pickle
 from concurrent.futures import ThreadPoolExecutor
 import os
-
+from .data_structures import TaskTypes, collectionElement, collection, AsyncTask
+from .background_tasks import setup_background_tasks
+from .image_viewer import show_images
 
 SAVE_FILE = "data/general.json"
 MEDIA_ROOT = "data/media"
@@ -94,6 +96,8 @@ class SpreadsheetModel(QAbstractTableModel):
         self._tableViewWidth = 0
         self._data_lock = asyncio.Lock()
         self._executor = ThreadPoolExecutor(max_workers=2)
+        self._selected_row = -1
+        self._selected_column = -1
             
     async def initialize(self):
         if not Path("data").exists():
@@ -264,89 +268,6 @@ class SpreadsheetModel(QAbstractTableModel):
                             self.save_to_file()
             self.condition.notify_all()
      
-    async def checkings_thread(self):
-        global pygame
-        import pygame
-        global find_valid_sortings
-        from models.generate_sortings import find_valid_sortings
-        self.imports_loaded.set()
-        firstIteration = True
-        while True:
-            task = None
-            with self.condition:
-                if not firstIteration:
-                    del self._collections.checkings_list[0]
-                firstIteration = False
-                while not self._collections.checkings_list:
-                    self.condition.wait()
-                task = self._collections.checkings_list[0]
-            data = self._collections.collections[task.collectionName].data
-            roles = self._collections.collections[task.collectionName].roles
-            res = find_valid_sortings(data, roles)
-            if type(res) is str:
-                self._errorMsg = res
-                self.signal.emit({"type": "FloatingWindow_text_changed", "value": res})
-            else:
-                if self._errorMsg:
-                    self._errorMsg = ""
-                    self.signal.emit({"type": "FloatingWindow_text_changed", "value": ""})
-    
-    async def sortings_thread(self):
-        self.imports_loaded.wait()
-        firstIteration = True
-        while True:
-            with self.condition:
-                if not firstIteration:
-                    del self._collections.checkings_list[0]
-                firstIteration = False
-                while not self._collections.checkings_list:
-                    self.condition.wait()
-                task = self._collections.sortings_list[0]
-                collectionName = task.collectionName
-                task_id = task.id
-            data = self._collections.collections[collectionName].data
-            roles = self._collections.collections[collectionName].roles
-            res = find_valid_sortings(data, roles)
-            async with self._data_lock:
-                if self._collections.sortings_list[0][1] != task_id:
-                    continue
-                if type(res) is str:
-                    for e in self._errorMsg:
-                        if e[0] == collectionName:
-                            e[1] = res
-                            break
-                    else:
-                        self._errorMsg.append([collectionName, res])
-                    self.signal.emit({"type": "FloatingWindow_text_changed", "value": "\n".join([" : ".join(e) for e in self._errorMsg])})
-                else:
-                    try:
-                        self._errorMsg.remove(e)
-                        self.signal.emit({"type": "FloatingWindow_text_changed", "value": "\n".join([" : ".join(e) for e in self._errorMsg])})
-                    except ValueError:
-                        pass
-                    if res[0] != list(range(len(data))):
-                        if collectionName == self._collections.collectionName:
-                            self.beginResetModel()
-                            self._data = [data[i] for i in res[0]]
-                            for r in self._data:
-                                for c in r:
-                                    match = re.match(r'after\s+([1-9][0-9]*)', c)
-                                    if match:
-                                        j = int(match.group(1)) - 1
-                                        c = re.sub(r'(after\s+)([1-9][0-9]*)', r'\1' + data.index(j), c)
-                                    else:
-                                        match = re.match(r'as far as possible from (\d+)', c)
-                                        if match:
-                                            X = int(match.group(1)) - 1
-                                            c = re.sub(r'as far as possible from (\d+)', f'as far as possible from {data.index(X)}', c)
-                            for i in range(len(self._data) - 1, -1, -1):
-                                if self._data[i] == [""] * len(self._data[0]):
-                                    self._data.pop(i)
-                                    self._rowHeights.pop(i)
-                            self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
-                            self.endResetModel()
-                            self.save_to_file()
-
     @Slot(result=str)
     def get_font_family(self):
         return self.font.family()
@@ -451,13 +372,22 @@ class SpreadsheetModel(QAbstractTableModel):
         return self._columns_nb
 
     def data(self, index, role=Qt.DisplayRole):
-        if role == Qt.DisplayRole and index.isValid():
-            if index.row() < len(self._data) and index.column() < (len(self._data[0]) if self._data else 0):
-                return self._data[index.row()][index.column()]
+        if not index.isValid():
+            return None
+        row = index.row()
+        column = index.column()
+        if role == Qt.DisplayRole:
+            if row < len(self._data) and column < (len(self._data[0]) if self._data else 0):
+                return self._data[row][column]
             else:
                 return ""
         elif role == Qt.BackgroundRole:
-            return self.get_cell_color(index.row(), index.column())
+            return self.get_cell_color(row, column)
+        elif role == Qt.DecorationRole:
+            print(f"Decoration role requested for row {row}, column {column}")
+            if self._selected_row == row and self._selected_column == column:
+                return 2
+            return int(self._selected_row == row or self._selected_column == column)
         return None
 
     def setData(self, index, value, role=Qt.EditRole):
@@ -545,7 +475,12 @@ class SpreadsheetModel(QAbstractTableModel):
         return (len(self._data[0]) if self._data else 0)
 
     def roleNames(self):
-        return {Qt.DisplayRole: b"display"}
+        roles = super().roleNames()
+        roles[Qt.DecorationRole] = b"decoration"
+        # roles[Qt.EditRole] = b"edit"
+        # roles[Qt.BackgroundRole] = b"background"
+        roles[Qt.DisplayRole] = b"display"
+        return roles
 
     @Slot(str, result=list)
     def getOtherCollectionNames(self, input_text):
@@ -590,24 +525,6 @@ class SpreadsheetModel(QAbstractTableModel):
             self.dataChanged.emit(index, index, [Qt.DisplayRole])
         asyncio.create_task(self.add_task(AsyncTask(TaskTypes.CHECKINGS, self._collections.collectionName)))
     
-    def load_and_scale_image(self, image_path, screen_width, screen_height):
-        try:
-            self.imports_loaded.wait()
-            image = pygame.image.load(image_path)
-            image_width, image_height = image.get_size()
-            
-            # Calculate scaling factor to fit the screen while maintaining aspect ratio
-            scale_factor = min(screen_width / image_width, screen_height / image_height)
-            new_width = int(image_width * scale_factor)
-            new_height = int(image_height * scale_factor)
-            
-            # Scale the image
-            scaled_image = pygame.transform.smoothscale(image, (new_width, new_height))
-            return scaled_image
-        except Exception as e:
-            print(f"Error loading image {image_path}: {e}")
-            return None
-
     def main_show(self, image_paths):
         # Initialize Pygame
         pygame.init()
@@ -684,3 +601,18 @@ class SpreadsheetModel(QAbstractTableModel):
                 for i in range(len(self._data))
                 if self._data[i][url_col] and os.path.exists(os.path.join(MEDIA_ROOT, self._data[i][url_col]))
             ])
+    
+    @Slot(int, int)
+    def cellClicked(self, row, column):
+        previously_selected_row = self._selected_row
+        previously_selected_column = self._selected_column
+        self._selected_row = row
+        self._selected_column = column
+        if row != previously_selected_row:
+            if previously_selected_row != -1:
+                self.dataChanged.emit(self.index(previously_selected_row, 0), self.index(previously_selected_row, self._columns_nb - 1), [Qt.DecorationRole])
+            self.dataChanged.emit(self.index(1, column), self.index(self._rows_nb - 20, column+1), [Qt.DecorationRole])
+        if column != previously_selected_column:
+            if previously_selected_column != -1:
+                self.dataChanged.emit(self.index(0, previously_selected_column), self.index(self._rows_nb - 1, previously_selected_column), [Qt.DecorationRole])
+            self.dataChanged.emit(self.index(0, column), self.index(self._rows_nb - 1, column), [Qt.DecorationRole])
