@@ -1,11 +1,10 @@
 import asyncio
 import random
 from .data_structures import AsyncTask, TaskTypes
+import re
 
 
 async def checkings_thread(self):
-    global pygame
-    import pygame
     global find_valid_sortings
     from models.generate_sortings import find_valid_sortings
     self.imports_loaded.set()

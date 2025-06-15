@@ -108,18 +108,22 @@ class SpreadsheetModel(QAbstractTableModel):
             if collections:
                 self._collections = collections
                 self.loadSpreadsheet(collections.collectionName)
-        except pickle.UnpicklingError:
+        except FileNotFoundError:
             self._collections = collection()
             self._collections.collectionName = self._getDefaultSpreadsheetName()
             await self.createCollection(self._collections.collectionName)
-        self._executor.submit(self.run_async, self.checkings_thread)
-        self._executor.submit(self.run_async, self.sortings_thread)
+        setup_background_tasks(self)
 
-    def run_async(self, coro_func):
+    def run_async(self, coro):
         """Helper to run coroutines in a new event loop per thread"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(coro_func())
+        try:
+            loop.run_until_complete(coro)
+        except Exception as e:
+            print(f"Error in background task: {e}")
+        finally:
+            loop.close()
 
     async def add_task(self, task_object):
         with self.condition:
@@ -525,78 +529,13 @@ class SpreadsheetModel(QAbstractTableModel):
             self.dataChanged.emit(index, index, [Qt.DisplayRole])
         asyncio.create_task(self.add_task(AsyncTask(TaskTypes.CHECKINGS, self._collections.collectionName)))
     
-    def main_show(self, image_paths):
-        # Initialize Pygame
-        pygame.init()
-        
-        # Get the screen info
-        screen_info = pygame.display.Info()
-        screen_width, screen_height = screen_info.current_w, screen_info.current_h
-        
-        # Create a borderless window at position (0,0) covering the entire screen
-        screen = pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
-        pygame.display.set_caption("Image Viewer")
-        
-        # Position window at top-left corner
-        os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"
-        
-        # Load and scale all images
-        scaled_images = []
-        for path in image_paths:
-            scaled_img = self.load_and_scale_image(path, screen_width, screen_height)
-            if scaled_img:
-                scaled_images.append(scaled_img)
-        
-        if not scaled_images:
-            print("No valid images to display.")
-            pygame.quit()
-            sys.exit(1)
-        
-        current_index = 0
-        
-        # Main loop
-        running = True
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        running = False
-                    elif event.key == pygame.K_RIGHT:
-                        current_index = (current_index + 1) % len(scaled_images)
-                    elif event.key == pygame.K_LEFT:
-                        current_index = (current_index - 1) % len(scaled_images)
-                    elif event.key == pygame.K_f:  # Toggle true fullscreen with F key
-                        if screen.get_flags() & pygame.FULLSCREEN:
-                            pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
-                        else:
-                            pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
-            
-            # Clear screen with black
-            screen.fill((0, 0, 0))
-            
-            # Display current image centered
-            current_image = scaled_images[current_index]
-            img_width, img_height = current_image.get_size()
-            x_pos = (screen_width - img_width) // 2
-            y_pos = (screen_height - img_height) // 2
-            screen.blit(current_image, (x_pos, y_pos))
-            
-            pygame.display.flip()
-        
-        pygame.quit()
-        sys.exit()
-
-
-    
     @Slot()
     def showButton(self):
         url_col = self._roles.index("urls") if "urls" in self._roles else -1
         if url_col != -1:
             if not os.path.exists(MEDIA_ROOT):
                 os.makedirs(MEDIA_ROOT)
-            self.main_show([
+            self.show_images([
                 os.path.join(MEDIA_ROOT, self._data[i][url_col])
                 for i in range(len(self._data))
                 if self._data[i][url_col] and os.path.exists(os.path.join(MEDIA_ROOT, self._data[i][url_col]))
@@ -611,8 +550,10 @@ class SpreadsheetModel(QAbstractTableModel):
         if row != previously_selected_row:
             if previously_selected_row != -1:
                 self.dataChanged.emit(self.index(previously_selected_row, 0), self.index(previously_selected_row, self._columns_nb - 1), [Qt.DecorationRole])
-            self.dataChanged.emit(self.index(1, column), self.index(self._rows_nb - 20, column+1), [Qt.DecorationRole])
+            self.dataChanged.emit(self.index(row, 0), self.index(row, self._columns_nb - 1), [Qt.DecorationRole])
+            # self.dataChanged.emit(self.index(row, 1), self.index(row, self._columns_nb - 1), [Qt.DecorationRole])
         if column != previously_selected_column:
             if previously_selected_column != -1:
                 self.dataChanged.emit(self.index(0, previously_selected_column), self.index(self._rows_nb - 1, previously_selected_column), [Qt.DecorationRole])
-            self.dataChanged.emit(self.index(0, column), self.index(self._rows_nb - 1, column), [Qt.DecorationRole])
+            # self.dataChanged.emit(self.index(0, column), self.index(self._rows_nb - 1, column), [Qt.DecorationRole])
+            self.dataChanged.emit(self.index(0, 0), self.index(self._rows_nb - 1, self._columns_nb - 1), [Qt.DecorationRole])
