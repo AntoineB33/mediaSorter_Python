@@ -11,6 +11,8 @@ from PySide6.QtCore import (
     Signal,
     QSortFilterProxyModel,
     QAbstractListModel,
+    QThread,
+    QObject,
 )
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
@@ -69,63 +71,20 @@ class AsyncTask:
         self.onlyCalculate = onlyCalculate
         self.id = random.random()
 
-class SpreadsheetModel(QAbstractTableModel):
-    signal = Signal(dict)
-    imports_loaded = threading.Event()
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        self.default_width = 100
-        self.horizontal_padding = 5
-        self.vertical_padding = 5
-        self.font = QFont("Arial", 10)
-
-        self.metrics = QFontMetrics(self.font)
-        self.condition = threading.Condition()
-        self._rows_nb = 0
-        self._columns_nb = 0
-        self._errorMsg = ""
-        self._verticalScrollPosition = 0
-        self._verticalScrollSize = 0
-        self._tableViewContentY = 0
-        self._tableViewHeight = 0
-        self._horizontalScrollPosition = 0
-        self._horizontalScrollSize = 0
-        self._tableViewContentX = 0
-        self._tableViewWidth = 0
-        self._data_lock = asyncio.Lock()
-        self._executor = ThreadPoolExecutor(max_workers=2)
-        self._selected_row = -1
-        self._selected_column = -1
-            
-    async def initialize(self):
-        if not Path("data").exists():
-            Path("data").mkdir(parents=True, exist_ok=True)
+class SpreadsheetWorker(QObject):
+    taskRequested = Signal(AsyncTask)
+    resultReady = Signal(object)
+    
+    @Slot(AsyncTask)
+    def process_task(self, task):
         try:
-            with open(SAVE_FILE, "rb") as f:
-                collections = pickle.load(f)
-            if collections:
-                self._collections = collections
-                self.loadSpreadsheet(collections.collectionName)
-        except FileNotFoundError:
-            self._collections = collection()
-            self._collections.collectionName = self._getDefaultSpreadsheetName()
-            await self.createCollection(self._collections.collectionName)
-        setup_background_tasks(self)
-
-    def run_async(self, coro):
-        """Helper to run coroutines in a new event loop per thread"""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(coro)
+            # Heavy operations go here
+            result = self.process_task_internal(task)
+            self.resultReady.emit(result)
         except Exception as e:
-            print(f"Error in background task: {e}")
-        finally:
-            loop.close()
-
-    async def add_task(self, task_object):
+            self.resultReady.emit({"error": str(e)})
+    
+    def process_task_internal(self, task):
         with self.condition:
             task_type = task_object.task_type
             collectionName = task_object.collectionName
@@ -271,7 +230,84 @@ class SpreadsheetModel(QAbstractTableModel):
                             self.signal.emit({"type": "input_text_changed", "value": self._collections.collectionName})
                             self.save_to_file()
             self.condition.notify_all()
-     
+    
+        return {"success": True}
+    
+class SpreadsheetModel(QAbstractTableModel):
+    signal = Signal(dict)
+    imports_loaded = threading.Event()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.default_width = 100
+        self.horizontal_padding = 5
+        self.vertical_padding = 5
+        self.font = QFont("Arial", 10)
+
+        self.metrics = QFontMetrics(self.font)
+        self.condition = threading.Condition()
+        self._rows_nb = 0
+        self._columns_nb = 0
+        self._errorMsg = ""
+        self._verticalScrollPosition = 0
+        self._verticalScrollSize = 0
+        self._tableViewContentY = 0
+        self._tableViewHeight = 0
+        self._horizontalScrollPosition = 0
+        self._horizontalScrollSize = 0
+        self._tableViewContentX = 0
+        self._tableViewWidth = 0
+        self._data_lock = asyncio.Lock()
+        self._executor = ThreadPoolExecutor(max_workers=2)
+        self._selected_row = -1
+        self._selected_column = -1
+        
+        self._worker_thread = QThread()
+        self._worker = SpreadsheetWorker()
+        self._worker.moveToThread(self._worker_thread)
+        self._worker.resultReady.connect(self.handle_worker_result)
+        self._worker.taskRequested.connect(self.process_async_task)
+        self._worker_thread.start()
+            
+    async def initialize(self):
+        if not Path("data").exists():
+            Path("data").mkdir(parents=True, exist_ok=True)
+        try:
+            with open(SAVE_FILE, "rb") as f:
+                collections = pickle.load(f)
+            if collections:
+                self._collections = collections
+                self.loadSpreadsheet(collections.collectionName)
+        except FileNotFoundError:
+            self._collections = collection()
+            self._collections.collectionName = self._getDefaultSpreadsheetName()
+            await self.createCollection(self._collections.collectionName)
+        setup_background_tasks(self)
+
+    def run_async(self, coro):
+        """Helper to run coroutines in a new event loop per thread"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(coro)
+        except Exception as e:
+            print(f"Error in background task: {e}")
+        finally:
+            loop.close()
+
+    @asyncSlot(AsyncTask)
+    async def add_task(self, task_object):
+        self._worker.taskRequested.emit(task_object)
+
+    @Slot(object)
+    def handle_worker_result(self, result):
+        if "error" in result:
+            print(f"Worker error: {result['error']}")
+        # Handle successful results
+        elif "dataChanged" in result:
+            self.dataChanged.emit(*result["dataChanged"])
+            
     @Slot(result=str)
     def get_font_family(self):
         return self.font.family()
@@ -551,9 +587,7 @@ class SpreadsheetModel(QAbstractTableModel):
             if previously_selected_row != -1:
                 self.dataChanged.emit(self.index(previously_selected_row, 0), self.index(previously_selected_row, self._columns_nb - 1), [Qt.DecorationRole])
             self.dataChanged.emit(self.index(row, 0), self.index(row, self._columns_nb - 1), [Qt.DecorationRole])
-            # self.dataChanged.emit(self.index(row, 1), self.index(row, self._columns_nb - 1), [Qt.DecorationRole])
         if column != previously_selected_column:
             if previously_selected_column != -1:
                 self.dataChanged.emit(self.index(0, previously_selected_column), self.index(self._rows_nb - 1, previously_selected_column), [Qt.DecorationRole])
-            # self.dataChanged.emit(self.index(0, column), self.index(self._rows_nb - 1, column), [Qt.DecorationRole])
-            self.dataChanged.emit(self.index(0, 0), self.index(self._rows_nb - 1, self._columns_nb - 1), [Qt.DecorationRole])
+            self.dataChanged.emit(self.index(0, column), self.index(self._rows_nb - 1, column), [Qt.DecorationRole])
