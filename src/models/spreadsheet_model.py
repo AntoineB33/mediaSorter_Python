@@ -118,12 +118,8 @@ class SpreadsheetModel(QAbstractTableModel):
         """Helper to run coroutines in a new event loop per thread"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(coro)
-        except Exception as e:
-            print(f"Error in background task: {e}")
-        finally:
-            loop.close()
+        loop.run_until_complete(coro)
+        loop.close()
 
     async def add_task(self, task_object):
         with self.condition:
@@ -388,7 +384,6 @@ class SpreadsheetModel(QAbstractTableModel):
         elif role == Qt.BackgroundRole:
             return self.get_cell_color(row, column)
         elif role == Qt.DecorationRole:
-            print(f"Decoration role requested for row {row}, column {column}")
             if self._selected_row == row and self._selected_column == column:
                 return 2
             return int(self._selected_row == row or self._selected_column == column)
@@ -551,9 +546,7 @@ class SpreadsheetModel(QAbstractTableModel):
             if previously_selected_row != -1:
                 self.dataChanged.emit(self.index(previously_selected_row, 0), self.index(previously_selected_row, self._columns_nb - 1), [Qt.DecorationRole])
             self.dataChanged.emit(self.index(row, 0), self.index(row, self._columns_nb - 1), [Qt.DecorationRole])
-            # self.dataChanged.emit(self.index(row, 1), self.index(row, self._columns_nb - 1), [Qt.DecorationRole])
         if column != previously_selected_column:
             if previously_selected_column != -1:
                 self.dataChanged.emit(self.index(0, previously_selected_column), self.index(self._rows_nb - 1, previously_selected_column), [Qt.DecorationRole])
-            # self.dataChanged.emit(self.index(0, column), self.index(self._rows_nb - 1, column), [Qt.DecorationRole])
-            self.dataChanged.emit(self.index(0, 0), self.index(self._rows_nb - 1, self._columns_nb - 1), [Qt.DecorationRole])
+            self.dataChanged.emit(self.index(0, column), self.index(self._rows_nb - 1, column), [Qt.DecorationRole])

@@ -272,9 +272,7 @@ Rectangle {
             width: 150
             
             onActivated: (index) => {
-                if (floatingWindow.currentColumn >= 0) {
-                    spreadsheetModel.setColumnRole(floatingWindow.currentColumn, model[index])
-                }
+                spreadsheetModel.setColumnRole(floatingWindow.currentColumn, model[index])
             }
         }
 
