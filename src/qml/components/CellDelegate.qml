@@ -73,8 +73,6 @@ Rectangle {
             cell.forceActiveFocus()
             cell.editing = true
             cell.editText = cell.display
-            cell.border.color = "black"
-            cell.border.width = 3
             spreadsheetModel.cellClicked(row, column)
             editor.forceActiveFocus()
             floatingWindow.currentColumn = column
@@ -101,6 +99,9 @@ Rectangle {
                         spreadsheetModel.index(row, column), 
                         Qt.DecorationRole
                     );
+                    if (decoration == 2) {
+                        console.log("Decoration 2 for cell at", row, column);
+                    }
                     cell.border.color = decoration == 0 ? "lightgray" : 
                         decoration == 2 ? "black" : "lightgreen";
                     cell.border.width = decoration == 2 ? 3 : 1;
