@@ -22,7 +22,7 @@ def load_and_scale_image(self, image_path, screen_width, screen_height):
         return None
 
 
-def show_images(image_paths):
+def show_images(self, image_paths):
     # Initialize Pygame
     pygame.init()
     
@@ -40,7 +40,7 @@ def show_images(image_paths):
     # Load and scale all images
     scaled_images = []
     for path in image_paths:
-        scaled_img = load_and_scale_image(path, screen_width, screen_height)
+        scaled_img = load_and_scale_image(self, path, screen_width, screen_height)
         if scaled_img:
             scaled_images.append(scaled_img)
     

@@ -7,13 +7,13 @@ Rectangle {
     property var tableView
     property var recommendations: []
     property alias errorTextItem: errorText
+    property alias roleComboBox: roleComboBox
     implicitWidth: columnLayout.implicitWidth
     implicitHeight: columnLayout.implicitHeight
     color: "lightblue"
     x: mainWindow.width - floatingWindow.width - tableView.ScrollBar.vertical.width
     y: 0
     z: 1
-    property int currentColumn: -1
 
     // Drag handling
     MouseArea {
@@ -256,12 +256,12 @@ Rectangle {
 
             Button {
                 text: "View"
-                onClicked: spreadsheetModel.viewButton(false)
+                onClicked: spreadsheetModel.viewButton()
             }
 
             Button {
                 text: "Show"
-                onClicked: spreadsheetModel.showButton(true)
+                onClicked: spreadsheetModel.showButton()
             }
         }
     
@@ -271,7 +271,7 @@ Rectangle {
             width: 150
             
             onActivated: (index) => {
-                spreadsheetModel.setColumnRole(floatingWindow.currentColumn, index)
+                spreadsheetModel.setColumnRole(index)
             }
         }
 

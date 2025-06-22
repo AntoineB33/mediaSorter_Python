@@ -33,7 +33,7 @@ Window {
                     floatingWindow.errorTextItem.text = data.value;
                     break;
                 case "selected_cell_changed":
-                    roleComboBox.currentIndex = spreadsheetModel.getSelectedCellRoleIndex(data.column);
+                    floatingWindow.roleComboBox.currentIndex = data.value;
                     break;
                 default:
                     console.warn("Unknown signal type:", data.type);

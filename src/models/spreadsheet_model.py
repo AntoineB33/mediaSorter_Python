@@ -109,13 +109,6 @@ class SpreadsheetModel(QAbstractTableModel):
     @Slot(result=list)
     def get_role_types(self):
         return self._role_types
-
-    @Slot(int, result=int)
-    def getSelectedCellRoleIndex(self, column):
-        """Return the index of the role type for the selected cell."""
-        if column < len(self._roles):
-            return self._role_types.index(self._roles[column])
-        return self._role_types.index(RoleTypes.NAMES)
             
     async def initialize(self):
         if not Path("data").exists():
@@ -179,6 +172,7 @@ class SpreadsheetModel(QAbstractTableModel):
                 case TaskTypes.SET_DATA:
                     row, col, value = task_object.row, task_object.column, task_object.value
                     async with self._data_lock:
+                        prev_role = self._roles[col] if col < len(self._roles) else RoleTypes.NAMES
                         if row >= len(self._data):
                             for r in range(len(self._data), row + 1):
                                 prevHeight = self._rowHeights[-1] if self._data else 0
@@ -204,22 +198,30 @@ class SpreadsheetModel(QAbstractTableModel):
                                 index = self.index(0, prev_col_nb)
                                 index2 = self.index(self._rows_nb - 1, col)
                                 self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
+                                self.signal.emit({"type": "selected_cell_changed", "value": self._role_types.index(RoleTypes.ATTRIBUTES)})
                             elif col == len(self._data[0]) - 1 and value == "":
+                                removed_col = False
                                 for c in range(col, -1, -1):
                                     if all(_row[c] == "" for _row in self._data):
+                                        removed_col = True
                                         for r in self._data:
                                             r.pop(c)
                                         self._columnWidths.pop(c)
                                         self._roles.pop(c)
-                                index = self.index(0, len(self._data[0]))
-                                index2 = self.index(self._rows_nb - 1, col)
-                                self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
+                                if removed_col:
+                                    index = self.index(0, len(self._data[0]))
+                                    index2 = self.index(self._rows_nb - 1, col)
+                                    self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
+                                    if prev_role != RoleTypes.NAMES:
+                                        self.signal.emit({"type": "selected_cell_changed", "value": self._role_types.index(RoleTypes.NAMES)})
                         elif self._roles:
                             self._columnWidths = []
                             index = self.index(0, 0)
                             index2 = self.index(self._rows_nb - 1, prev_col_nb)
                             self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
                             self._roles = []
+                            if prev_role != RoleTypes.NAMES:
+                                self.signal.emit({"type": "selected_cell_changed", "value": self._role_types.index(RoleTypes.NAMES)})
                         if row < len(self._data) and col < len(self._data[0]):
                             self._data[row][col] = value
                         self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
@@ -544,24 +546,24 @@ class SpreadsheetModel(QAbstractTableModel):
     def sortButton(self, onlyCalculate):
         asyncio.create_task(self.add_task(AsyncTask(TaskTypes.SORTINGS, self._collections.collectionName, onlyCalculate=onlyCalculate)))
     
-    @Slot(int, int)
-    def setColumnRole(self, column, ind):
+    @Slot(int)
+    def setColumnRole(self, ind):
         """Set the role for a specific column."""
-        if column < len(self._roles):
-            self._roles[column] = self._role_types[ind]
+        if self._selected_column < len(self._roles):
+            self._roles[self._selected_column] = self._role_types[ind]
             # Notify views that header row (row 0) needs to update
-            index = self.index(0, column)
-            index2 = self.index(self._rows_nb - 1, column)
+            index = self.index(0, self._selected_column)
+            index2 = self.index(self._rows_nb - 1, self._selected_column)
             self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
         asyncio.create_task(self.add_task(AsyncTask(TaskTypes.CHECKINGS, self._collections.collectionName)))
     
     @Slot()
     def showButton(self):
-        url_col = self._roles.index(RoleTypes.URLS) if RoleTypes.URLS in self._roles else -1
+        url_col = self._roles.index(RoleTypes.PATH) if RoleTypes.PATH in self._roles else -1
         if url_col != -1:
             if not os.path.exists(MEDIA_ROOT):
                 os.makedirs(MEDIA_ROOT)
-            self.show_images([
+            show_images(self, [
                 os.path.join(MEDIA_ROOT, self._data[i][url_col])
                 for i in range(len(self._data))
                 if self._data[i][url_col] and os.path.exists(os.path.join(MEDIA_ROOT, self._data[i][url_col]))
@@ -585,3 +587,9 @@ class SpreadsheetModel(QAbstractTableModel):
             if previously_selected_column != -1:
                 self.dataChanged.emit(self.index(0, previously_selected_column), self.index(self._rows_nb - 1, previously_selected_column), [Qt.DecorationRole])
             self.dataChanged.emit(self.index(0, column), self.index(self._rows_nb - 1, column), [Qt.DecorationRole])
+            
+            if column < len(self._roles):
+                role_combo = self._role_types.index(self._roles[column])
+            else:
+                role_combo = self._role_types.index(RoleTypes.NAMES)
+            self.signal.emit({"type": "selected_cell_changed", "value": role_combo})

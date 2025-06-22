@@ -81,7 +81,6 @@ Rectangle {
             cell.editText = cell.display
             spreadsheetModel.cellClicked(row, column)
             editor.forceActiveFocus()
-            floatingWindow.currentColumn = column
         }
     }
 }
