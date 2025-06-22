@@ -17,6 +17,8 @@ ListView {
         row: 0
         column: index
         display: spreadsheetModel.data(spreadsheetModel.index(0, index), Qt.DisplayRole)
+        background: spreadsheetModel.data(spreadsheetModel.index(0, index), Qt.BackgroundRole)
+        decoration: spreadsheetModel.data(spreadsheetModel.index(0, index), Qt.DecorationRole)
     }
 
     contentX: tableView.contentX

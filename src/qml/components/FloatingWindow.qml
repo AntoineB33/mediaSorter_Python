@@ -7,8 +7,8 @@ Rectangle {
     property var tableView
     property var recommendations: []
     property alias errorTextItem: errorText
-    width: 300
-    height: 500
+    implicitWidth: columnLayout.implicitWidth
+    implicitHeight: columnLayout.implicitHeight
     color: "lightblue"
     x: mainWindow.width - floatingWindow.width - tableView.ScrollBar.vertical.width
     y: 0
@@ -63,7 +63,7 @@ Rectangle {
     }
 
     ColumnLayout {
-        anchors.centerIn: parent
+        id: columnLayout
         spacing: 20
 
         RowLayout {

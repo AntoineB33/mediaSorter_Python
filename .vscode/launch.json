@@ -21,10 +21,10 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Python Debugger: main.py",
+            "name": "Python Debugger: drafts/main.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/main.py",
+            "program": "${workspaceFolder}/drafts/main.py",
             "console": "integratedTerminal"
         }
     ]

@@ -168,6 +168,7 @@ class SpreadsheetModel(QAbstractTableModel):
                                 self._data.append([""] * (len(self._data[0]) if self._data else 0))
                         elif row == len(self._data) - 1 and value == "":
                             self._data[row][col] = ""
+                            prev_col_nb = len(self._data[0])
                             for r in range(row, -1, -1):
                                 if self._data[r] == [""] * len(self._data[0]):
                                     self._data.pop(r)
@@ -183,7 +184,7 @@ class SpreadsheetModel(QAbstractTableModel):
                                     self._columnWidths.append(prevWidth + self.columnWidth(-1))
                                     self._roles.append("attributes")
                                 index = self.index(0, prev_col_nb)
-                                index2 = self.index(0, col)
+                                index2 = self.index(self._rows_nb - 1, col)
                                 self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
                             elif col == len(self._data[0]) - 1 and value == "":
                                 for c in range(col, -1, -1):
@@ -193,12 +194,12 @@ class SpreadsheetModel(QAbstractTableModel):
                                         self._columnWidths.pop(c)
                                         self._roles.pop(c)
                                 index = self.index(0, len(self._data[0]))
-                                index2 = self.index(0, col)
+                                index2 = self.index(self._rows_nb - 1, col)
                                 self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
                         elif self._roles:
                             self._columnWidths = []
                             index = self.index(0, 0)
-                            index2 = self.index(0, len(self._roles))
+                            index2 = self.index(self._rows_nb - 1, prev_col_nb)
                             self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
                             self._roles = []
                         if row < len(self._data) and col < len(self._data[0]):
@@ -298,19 +299,6 @@ class SpreadsheetModel(QAbstractTableModel):
             return self._rowHeights[row] - prevHeight
         return self.metrics.height() + self.vertical_padding * 2
     
-    @Slot(int, int, result=str)
-    def get_cell_color(self, row, column):
-        if row != 0 or column >= len(self._roles):
-            return "white"
-        elif self._roles[column] == "names":
-            return "lightblue"
-        elif self._roles[column] == "dependencies":
-            return "lightgreen"
-        elif self._roles[column] == "attributes":
-            return "lightyellow"
-        elif self._roles[column] == "urls":
-            return "lightcoral"
-    
     @Slot(result=str)
     def get_collectionName(self):
         return self._collections.collectionName
@@ -370,6 +358,19 @@ class SpreadsheetModel(QAbstractTableModel):
     @Slot(result=int)
     def columnCount(self, parent=QModelIndex()):
         return self._columns_nb
+    
+    @Slot(int, result=str)
+    def get_cell_color(self, column):
+        if column >= len(self._roles):
+            return "white"
+        elif self._roles[column] == "names":
+            return "lightblue"
+        elif self._roles[column] == "dependencies":
+            return "lightgreen"
+        elif self._roles[column] == "attributes":
+            return "lightyellow"
+        elif self._roles[column] == "urls":
+            return "lightcoral"
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
@@ -382,7 +383,7 @@ class SpreadsheetModel(QAbstractTableModel):
             else:
                 return ""
         elif role == Qt.BackgroundRole:
-            return self.get_cell_color(row, column)
+            return self.get_cell_color(column)
         elif role == Qt.DecorationRole:
             if self._selected_row == row and self._selected_column == column:
                 return 2
@@ -412,9 +413,13 @@ class SpreadsheetModel(QAbstractTableModel):
             self._rows_nb = count
             self.endRemoveRows()
         elif count > self._rows_nb:
+            prev_row_nb = self._rows_nb
             self.beginInsertRows(QModelIndex(), self._rows_nb, count - 1)
             self._rows_nb = count
             self.endInsertRows()
+            index = self.index(prev_row_nb, 0)
+            index2 = self.index(count - 1, self._columns_nb - 1)
+            self.dataChanged.emit(index, index2, [Qt.BackgroundRole, Qt.DecorationRole])
 
     @Slot(int)
     def setColumns(self, count):
@@ -424,10 +429,17 @@ class SpreadsheetModel(QAbstractTableModel):
             self.beginRemoveColumns(QModelIndex(), count, self._columns_nb - 1)
             self._columns_nb = count
             self.endRemoveColumns()
+            index = self.index(0, 0)
+            index2 = self.index(self._rows_nb - 1, self._columns_nb - 1)
+            self.dataChanged.emit(index, index2, [Qt.DisplayRole])
         elif count > self._columns_nb:
+            prev_col_nb = self._columns_nb
             self.beginInsertColumns(QModelIndex(), self._columns_nb, count - 1)
             self._columns_nb = count
             self.endInsertColumns()
+            index = self.index(0, prev_col_nb)
+            index2 = self.index(self._rows_nb - 1, count - 1)
+            self.dataChanged.emit(index, index2, [Qt.DecorationRole])
     
     @Slot(float, float, float, float, bool)
     def verticalScroll(self, position, size, tableViewContentY, tableViewHeight, start=False):
@@ -476,8 +488,8 @@ class SpreadsheetModel(QAbstractTableModel):
     def roleNames(self):
         roles = super().roleNames()
         roles[Qt.DecorationRole] = b"decoration"
-        # roles[Qt.EditRole] = b"edit"
-        # roles[Qt.BackgroundRole] = b"background"
+        roles[Qt.BackgroundRole] = b"background"
+        roles[Qt.EditRole] = b"edit"
         roles[Qt.DisplayRole] = b"display"
         return roles
 
@@ -521,7 +533,8 @@ class SpreadsheetModel(QAbstractTableModel):
             self._roles[column] = role
             # Notify views that header row (row 0) needs to update
             index = self.index(0, column)
-            self.dataChanged.emit(index, index, [Qt.DisplayRole])
+            index2 = self.index(len(self._data) - 1, column)
+            self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
         asyncio.create_task(self.add_task(AsyncTask(TaskTypes.CHECKINGS, self._collections.collectionName)))
     
     @Slot()
@@ -535,6 +548,10 @@ class SpreadsheetModel(QAbstractTableModel):
                 for i in range(len(self._data))
                 if self._data[i][url_col] and os.path.exists(os.path.join(MEDIA_ROOT, self._data[i][url_col]))
             ])
+    
+    # def _updateCells(self, index1, index2, roles):
+    #     if index1.row() == 0:
+
     
     @Slot(int, int)
     def cellClicked(self, row, column):
