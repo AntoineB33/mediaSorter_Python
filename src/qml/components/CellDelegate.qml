@@ -20,6 +20,9 @@ Rectangle {
     required property int row
     property bool editing: false
     property string editText: ""  // Added to track edited text
+    // property var display: spreadsheetModel.data(spreadsheetModel.index(0, index), Qt.DisplayRole)
+    // property var background: spreadsheetModel.data(spreadsheetModel.index(0, index), Qt.BackgroundRole)
+    // property var decoration: spreadsheetModel.data(spreadsheetModel.index(0, index), Qt.DecorationRole)
     required property var display    // For DisplayRole
     required property var background // For BackgroundRole
     required property var decoration // For DecorationRole

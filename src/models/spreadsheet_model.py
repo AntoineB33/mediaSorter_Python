@@ -45,6 +45,12 @@ class TaskTypes:
     CREATE_COLLECTION = "createCollection"
     DELETE_COLLECTION = "deleteCollection"
 
+class RoleTypes:
+    NAMES = "names"
+    DEPENDENCIES = "dependencies"
+    ATTRIBUTES = "attributes"
+    PATH = "path"
+
 class collectionElement:
     def __init__(self, rowHeights, columnWidths):
         self.data = [["names"]]
@@ -98,6 +104,18 @@ class SpreadsheetModel(QAbstractTableModel):
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._selected_row = -1
         self._selected_column = -1
+        self._role_types = [RoleTypes.NAMES, RoleTypes.DEPENDENCIES, RoleTypes.ATTRIBUTES, RoleTypes.PATH]
+    
+    @Slot(result=list)
+    def get_role_types(self):
+        return self._role_types
+
+    @Slot(int, result=int)
+    def getSelectedCellRoleIndex(self, column):
+        """Return the index of the role type for the selected cell."""
+        if column < len(self._roles):
+            return self._role_types.index(self._roles[column])
+        return self._role_types.index(RoleTypes.NAMES)
             
     async def initialize(self):
         if not Path("data").exists():
@@ -182,7 +200,7 @@ class SpreadsheetModel(QAbstractTableModel):
                                 for j in range(prev_col_nb, col + 1):
                                     prevWidth = self._columnWidths[-1] if len(self._columnWidths) else 0
                                     self._columnWidths.append(prevWidth + self.columnWidth(-1))
-                                    self._roles.append("attributes")
+                                    self._roles.append(RoleTypes.ATTRIBUTES)
                                 index = self.index(0, prev_col_nb)
                                 index2 = self.index(self._rows_nb - 1, col)
                                 self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
@@ -363,13 +381,13 @@ class SpreadsheetModel(QAbstractTableModel):
     def get_cell_color(self, column):
         if column >= len(self._roles):
             return "white"
-        elif self._roles[column] == "names":
+        elif self._roles[column] == RoleTypes.NAMES:
             return "lightblue"
-        elif self._roles[column] == "dependencies":
+        elif self._roles[column] == RoleTypes.DEPENDENCIES:
             return "lightgreen"
-        elif self._roles[column] == "attributes":
+        elif self._roles[column] == RoleTypes.ATTRIBUTES:
             return "lightyellow"
-        elif self._roles[column] == "urls":
+        elif self._roles[column] == RoleTypes.PATH:
             return "lightcoral"
 
     def data(self, index, role=Qt.DisplayRole):
@@ -526,20 +544,20 @@ class SpreadsheetModel(QAbstractTableModel):
     def sortButton(self, onlyCalculate):
         asyncio.create_task(self.add_task(AsyncTask(TaskTypes.SORTINGS, self._collections.collectionName, onlyCalculate=onlyCalculate)))
     
-    @Slot(int, str)
-    def setColumnRole(self, column, role):
+    @Slot(int, int)
+    def setColumnRole(self, column, ind):
         """Set the role for a specific column."""
         if column < len(self._roles):
-            self._roles[column] = role
+            self._roles[column] = self._role_types[ind]
             # Notify views that header row (row 0) needs to update
             index = self.index(0, column)
-            index2 = self.index(len(self._data) - 1, column)
+            index2 = self.index(self._rows_nb - 1, column)
             self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
         asyncio.create_task(self.add_task(AsyncTask(TaskTypes.CHECKINGS, self._collections.collectionName)))
     
     @Slot()
     def showButton(self):
-        url_col = self._roles.index("urls") if "urls" in self._roles else -1
+        url_col = self._roles.index(RoleTypes.URLS) if RoleTypes.URLS in self._roles else -1
         if url_col != -1:
             if not os.path.exists(MEDIA_ROOT):
                 os.makedirs(MEDIA_ROOT)

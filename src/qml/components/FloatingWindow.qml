@@ -14,7 +14,6 @@ Rectangle {
     y: 0
     z: 1
     property int currentColumn: -1
-    property var roleOptions: ["names", "dependencies", "attributes", "path"]
 
     // Drag handling
     MouseArea {
@@ -268,11 +267,11 @@ Rectangle {
     
         ComboBox {
             id: roleComboBox
-            model: floatingWindow.roleOptions
+            model: spreadsheetModel.get_role_types()
             width: 150
             
             onActivated: (index) => {
-                spreadsheetModel.setColumnRole(floatingWindow.currentColumn, model[index])
+                spreadsheetModel.setColumnRole(floatingWindow.currentColumn, index)
             }
         }
 

@@ -26,5 +26,25 @@ ListView {
         function onRowsRemoved(parent, first, last) { 
             rowHeader.model = spreadsheetModel.rowCount(); 
         }
+        // function onDataChanged(topLeft, bottomRight, roles) {
+        //     if (topLeft.column === 0) {
+        //         // Force model update when first row changes
+        //         rowHeader.model = 0
+        //         rowHeader.model = spreadsheetModel.rowCount();
+        //     }
+        // }
+        // function onDataChanged(topLeft, bottomRight, roles) {
+        //     if (topLeft.column == 0) {
+        //         const startRow = topLeft.row
+        //         const endRow = bottomRight.row
+
+        //         for (let row = startRow; row <= endRow; row++) {
+        //             const item = rowHeader.itemAt(row)
+        //             if (item) {
+        //                 item.decorationChanged()
+        //             }
+        //         }
+        //     }
+        // }
     }
 }
