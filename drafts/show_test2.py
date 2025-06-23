@@ -234,9 +234,9 @@ if __name__ == "__main__":
     # Example list of media paths
     media_paths = [
         "data/media/image1.jpg",
-        "data/media/video1.mkv",
+        "PremiumBukkake - Andrea swallows 67 huge mouthful cumshots.mp4",
         "data/media/image2.jpg",
-        "data/media/video2.mkv"
+        "ThickForcefulIberianlynx-mobile.mp4"
     ]
     
     # Ensure paths are absolute or correctly relative

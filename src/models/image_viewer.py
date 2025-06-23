@@ -183,12 +183,10 @@ def show_images(self, image_paths):
             screen.blit(current_image, (x_pos, y_pos))
             pygame.display.flip()
         elif media_type == "mp4":
-            # Play video using OpenCV
             if video_cap is None:
                 video_cap = cv2.VideoCapture(video_paths[current_index])
                 if not video_cap.isOpened():
                     print(f"Failed to open video: {video_paths[current_index]}")
-                    # Skip to next
                     current_index += 1
                     if video_cap is not None:
                         video_cap.release()
@@ -196,44 +194,55 @@ def show_images(self, image_paths):
                     continue
                 video_fps = video_cap.get(cv2.CAP_PROP_FPS) or 30
                 video_frame_time = 1000 / video_fps
-                video_last_frame = pygame.time.get_ticks()
+                video_next_frame_time = pygame.time.get_ticks()
                 video_paused = False
 
             if not video_paused:
                 now = pygame.time.get_ticks()
-                if now - video_last_frame >= video_frame_time:
+                # Only process if it's time for the next frame
+                if now >= video_next_frame_time:
+                    # Calculate how many frames we need to advance
+                    frames_to_advance = 1
+                    # If we're behind, skip frames to catch up
+                    if now > video_next_frame_time + video_frame_time:
+                        frames_to_advance = min(
+                            10,  # Limit to 10 frames max to avoid large jumps
+                            int((now - video_next_frame_time) / video_frame_time)
+                        )
+                    
+                    # Skip frames if needed
+                    for _ in range(frames_to_advance - 1):
+                        if not video_cap.grab():
+                            break
+                    
+                    # Read the current frame
                     ret, frame = video_cap.read()
                     if not ret:
-                        # End of video, go to next medium
+                        # End of video handling
                         video_cap.release()
                         video_cap = None
                         current_index += 1
                         if current_index >= len(scaled_images):
                             running = False
                         continue
-                    video_last_frame = now
-                    # Convert BGR to RGB
+                    
+                    # Update timing for next frame
+                    video_next_frame_time += frames_to_advance * video_frame_time
+                    
+                    # Process and display frame
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    # Scale to fit screen
                     h, w, _ = frame.shape
-                    scale_factor = min(
-                        1.0,
-                        min(screen_width / w, screen_height / h)
-                    )
+                    scale_factor = min(1.0, min(screen_width / w, screen_height / h))
                     new_width = int(w * scale_factor)
                     new_height = int(h * scale_factor)
                     frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
-                    # Convert to pygame surface
                     surf = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
-                    # Draw video frame
+                    
                     screen.fill((0, 0, 0))
                     x_pos = (screen_width - new_width) // 2
                     y_pos = (screen_height - new_height) // 2
                     screen.blit(surf, (x_pos, y_pos))
                     pygame.display.flip()
-            else:
-                # If paused, just keep the last frame on screen
-                pass
         else:
             # Static image
             current_image = scaled_images[current_index]
