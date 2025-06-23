@@ -3,6 +3,7 @@ import os
 import sys
 from PIL import Image  # Add Pillow for GIF support
 import cv2  # For mp4 playback
+from moviepy.editor import VideoFileClip  # For audio playback from mp4
 
 
 def load_and_scale_image(self, image_path, screen_width, screen_height):
@@ -131,6 +132,7 @@ def show_images(self, image_paths):
     video_frame_time = 0
     video_last_frame = 0
     video_paused = False
+    audio_clip = None  # For moviepy audio playback
 
     while running:
         dt = clock.tick(60)  # milliseconds since last tick
@@ -145,10 +147,13 @@ def show_images(self, image_paths):
                         current_index += 1
                         gif_frame_idx = 0
                         gif_elapsed = 0
-                        # Release video if switching away
+                        # Release video/audio if switching away
                         if video_cap is not None:
                             video_cap.release()
                             video_cap = None
+                        if audio_clip is not None:
+                            audio_clip.close()
+                            audio_clip = None
                 elif event.key == pygame.K_LEFT:
                     if current_index > 0:
                         current_index -= 1
@@ -157,6 +162,9 @@ def show_images(self, image_paths):
                         if video_cap is not None:
                             video_cap.release()
                             video_cap = None
+                        if audio_clip is not None:
+                            audio_clip.close()
+                            audio_clip = None
                 elif event.key == pygame.K_f:
                     if screen.get_flags() & pygame.FULLSCREEN:
                         pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
@@ -165,6 +173,14 @@ def show_images(self, image_paths):
                 elif event.key == pygame.K_SPACE:
                     if media_types[current_index] == "mp4":
                         video_paused = not video_paused
+                        # Pause/resume audio
+                        if audio_clip is not None:
+                            if video_paused:
+                                audio_clip.reader.close_proc()
+                            else:
+                                # Restart audio from current frame position
+                                # Not perfect sync, but resumes audio
+                                audio_clip.preview(audio=True, video=False)
 
         media_type = media_types[current_index]
         if media_type == "gif":
@@ -191,11 +207,19 @@ def show_images(self, image_paths):
                     if video_cap is not None:
                         video_cap.release()
                         video_cap = None
+                    if audio_clip is not None:
+                        audio_clip.close()
+                        audio_clip = None
                     continue
                 video_fps = video_cap.get(cv2.CAP_PROP_FPS) or 30
                 video_frame_time = 1000 / video_fps
                 video_next_frame_time = pygame.time.get_ticks()
                 video_paused = False
+                # Start audio playback
+                if audio_clip is not None:
+                    audio_clip.close()
+                audio_clip = VideoFileClip(video_paths[current_index])
+                audio_clip.audio.preview()  # Play audio in a separate thread
 
             if not video_paused:
                 now = pygame.time.get_ticks()
@@ -255,5 +279,7 @@ def show_images(self, image_paths):
 
     if video_cap is not None:
         video_cap.release()
+    if audio_clip is not None:
+        audio_clip.close()
     pygame.quit()
     return
