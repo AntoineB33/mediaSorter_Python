@@ -21,3 +21,6 @@ Thumbs.db
 # Virtual environments
 venv/
 .env/
+
+# any bin folder in any subdirectory
+**/bin/

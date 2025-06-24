@@ -1,24 +1,62 @@
 import pygame
 import os
 import sys
-from PIL import Image  # Add Pillow for GIF support
-import cv2  # For mp4 playback
-from moviepy.editor import VideoFileClip  # For audio playback from mp4
+import tempfile
+import subprocess
+import threading
+import time
+from PIL import Image
+import cv2
+import numpy as np
+import logging
 
+# Set up logging
+logging.basicConfig(filename='media_viewer.log', level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Add this function to get the path to ffmpeg with better error handling
+def get_ffmpeg_path():
+    # First try system PATH
+    try:
+        result = subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode == 0:
+            logging.info("FFmpeg found in system PATH")
+            return "ffmpeg"
+    except Exception:
+        pass
+    
+    # Try local bin directory (relative to this script)
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        bin_dir = os.path.join(script_dir, "bin")
+        ffmpeg_path = os.path.join(bin_dir, "ffmpeg.exe")
+        
+        if os.path.exists(ffmpeg_path):
+            logging.info(f"FFmpeg found in local bin directory: {ffmpeg_path}")
+            return ffmpeg_path
+    except Exception as e:
+        logging.error(f"Error checking local bin directory: {e}")
+    
+    # Try current working directory
+    try:
+        if os.path.exists("ffmpeg.exe"):
+            logging.info("FFmpeg found in current directory")
+            return "ffmpeg.exe"
+    except Exception:
+        pass
+    
+    logging.warning("FFmpeg not found in any location")
+    return None
 
 def load_and_scale_image(self, image_path, screen_width, screen_height):
     try:
-        self.imports_loaded.wait()
         image = pygame.image.load(image_path)
-        # Ensure image is 24-bit or 32-bit for smooth scaling
         if image.get_alpha() is not None:
             image = image.convert_alpha()
         else:
             image = image.convert()
         image_width, image_height = image.get_size()
         
-        # Calculate scaling factor to fit the screen while maintaining aspect ratio
-        # Only scale down, never scale up
         scale_factor = min(
             1.0,
             min(screen_width / image_width, screen_height / image_height)
@@ -26,27 +64,22 @@ def load_and_scale_image(self, image_path, screen_width, screen_height):
         new_width = int(image_width * scale_factor)
         new_height = int(image_height * scale_factor)
         
-        # Scale the image only if needed
         if scale_factor < 1.0:
             scaled_image = pygame.transform.smoothscale(image, (new_width, new_height))
         else:
             scaled_image = image
         return scaled_image
     except Exception as e:
-        print(f"Error loading image {image_path}: {e}")
+        logging.error(f"Error loading image {image_path}: {e}")
         return None
 
-
 def load_gif_frames(image_path, screen_width, screen_height):
-    """Load all frames from a GIF and scale them to fit the screen."""
     frames = []
     durations = []
     try:
         img = Image.open(image_path)
-        # Get duration for each frame (in ms)
         while True:
             frame = img.convert("RGBA")
-            # Scale frame to fit screen
             img_width, img_height = frame.size
             scale_factor = min(
                 1.0,
@@ -55,40 +88,48 @@ def load_gif_frames(image_path, screen_width, screen_height):
             new_width = int(img_width * scale_factor)
             new_height = int(img_height * scale_factor)
             frame = frame.resize((new_width, new_height), Image.LANCZOS)
-            # Convert to pygame surface
             mode = frame.mode
             data = frame.tobytes()
             surface = pygame.image.fromstring(data, frame.size, mode)
             frames.append(surface)
-            durations.append(img.info.get('duration', 100))  # default 100ms
+            durations.append(img.info.get('duration', 100))
             img.seek(img.tell() + 1)
     except EOFError:
-        pass  # End of sequence
+        pass
     except Exception as e:
-        print(f"Error loading GIF {image_path}: {e}")
+        logging.error(f"Error loading GIF {image_path}: {e}")
     return frames, durations
-
 
 def show_images(self, image_paths):
     # Initialize Pygame
     pygame.init()
+    pygame.font.init()
+    pygame.mixer.init()
     
-    # Get the screen info
+    # Get display info
     screen_info = pygame.display.Info()
     screen_width, screen_height = screen_info.current_w, screen_info.current_h
     
-    # Create a borderless window at position (0,0) covering the entire screen
+    # Create borderless window
     screen = pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
     pygame.display.set_caption("Image Viewer")
     
-    # Position window at top-left corner
-    os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"
-    
-    # Load and scale all images (support GIFs and mark mp4s)
+    # Load media
     scaled_images = []
-    gif_infos = []  # List of (frames, durations) or None for static images
-    media_types = []  # "image", "gif", or "mp4"
+    gif_infos = []
+    media_types = []
     video_paths = []
+    audio_threads = []
+    audio_files = []
+    
+    # Get ffmpeg path
+    ffmpeg_path = get_ffmpeg_path()
+    ffmpeg_available = ffmpeg_path is not None
+    
+    if not ffmpeg_available:
+        logging.warning("FFmpeg not found. Videos will play without audio.")
+        print("Warning: FFmpeg not found. Videos will play without audio.")
+    
     for path in image_paths:
         ext = os.path.splitext(path)[1].lower()
         if ext == ".gif":
@@ -98,15 +139,63 @@ def show_images(self, image_paths):
                 gif_infos.append((frames, durations))
                 media_types.append("gif")
                 video_paths.append(None)
+                audio_files.append(None)
             else:
+                scaled_images.append(None)
                 gif_infos.append(None)
                 media_types.append("image")
                 video_paths.append(None)
+                audio_files.append(None)
         elif ext == ".mp4":
             scaled_images.append(None)
             gif_infos.append(None)
             media_types.append("mp4")
             video_paths.append(path)
+            
+            # Create temporary audio file
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmpfile:
+                audio_path = tmpfile.name
+            audio_files.append(audio_path)
+            
+            # Only extract audio if ffmpeg is available
+            if ffmpeg_available:
+                # Start audio extraction in background thread
+                def extract_audio(video_path, audio_path, ffmpeg_path):
+                    try:
+                        logging.info(f"Starting audio extraction for {video_path}")
+                        cmd = [
+                            ffmpeg_path,
+                            '-y',  # Overwrite output
+                            '-i', f'"{video_path}"',  # Quote paths to handle spaces
+                            '-vn',  # No video
+                            '-acodec', 'pcm_s16le',
+                            '-ar', '44100',
+                            '-ac', '2',
+                            f'"{audio_path}"'
+                        ]
+                        
+                        # Print the command for debugging
+                        cmd_str = " ".join(cmd)
+                        logging.info(f"Running command: {cmd_str}")
+                        
+                        # Run the command with shell=True to handle paths with spaces
+                        result = subprocess.run(cmd_str, shell=True, capture_output=True, text=True)
+                        
+                        if result.returncode != 0:
+                            logging.error(f"Audio extraction failed for {video_path}")
+                            logging.error(f"FFmpeg stderr: {result.stderr}")
+                        else:
+                            logging.info(f"Audio extraction successful for {video_path}")
+                    except Exception as e:
+                        logging.error(f"Audio extraction exception for {video_path}: {e}")
+                
+                t = threading.Thread(target=extract_audio, args=(path, audio_path, ffmpeg_path))
+                t.daemon = True
+                t.start()
+                audio_threads.append(t)
+            else:
+                # Create an empty file to avoid errors
+                open(audio_path, 'w').close()
         else:
             scaled_img = load_and_scale_image(self, path, screen_width, screen_height)
             if scaled_img:
@@ -114,28 +203,39 @@ def show_images(self, image_paths):
                 gif_infos.append(None)
                 media_types.append("image")
                 video_paths.append(None)
+                audio_files.append(None)
+            else:
+                scaled_images.append(None)
+                gif_infos.append(None)
+                media_types.append("image")
+                video_paths.append(None)
+                audio_files.append(None)
 
-    if not scaled_images:
-        print("No valid images to display.")
+    # Filter valid media
+    valid_indices = [i for i, media in enumerate(media_types) 
+                   if media == "mp4" or (media == "image" and scaled_images[i]) or (media == "gif" and gif_infos[i])]
+    if not valid_indices:
+        logging.error("No valid media to display")
+        print("No valid media to display")
         pygame.quit()
         return
 
     current_index = 0
     gif_frame_idx = 0
     gif_elapsed = 0
-
     clock = pygame.time.Clock()
     running = True
-
+    
+    # Video state
     video_cap = None
-    video_fps = 30
-    video_frame_time = 0
-    video_last_frame = 0
+    video_start_time = 0
     video_paused = False
-    audio_clip = None  # For moviepy audio playback
+    last_video_frame = None
+    last_video_pos = (0, 0)
+    audio_playing = False
 
     while running:
-        dt = clock.tick(60)  # milliseconds since last tick
+        dt = clock.tick(60)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -143,143 +243,176 @@ def show_images(self, image_paths):
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_RIGHT:
-                    if current_index < len(scaled_images) - 1:
-                        current_index += 1
+                    # Find next valid media
+                    next_index = current_index + 1
+                    while next_index < len(valid_indices):
+                        if valid_indices[next_index] != current_index:
+                            break
+                        next_index += 1
+                    if next_index < len(valid_indices):
+                        current_index = next_index
                         gif_frame_idx = 0
                         gif_elapsed = 0
-                        # Release video/audio if switching away
-                        if video_cap is not None:
+                        video_paused = False
+                        video_start_time = pygame.time.get_ticks()
+                        last_video_frame = None
+                        if audio_playing:
+                            pygame.mixer.music.stop()
+                            audio_playing = False
+                        if video_cap:
                             video_cap.release()
                             video_cap = None
-                        if audio_clip is not None:
-                            audio_clip.close()
-                            audio_clip = None
                 elif event.key == pygame.K_LEFT:
-                    if current_index > 0:
-                        current_index -= 1
+                    # Find previous valid media
+                    prev_index = current_index - 1
+                    while prev_index >= 0:
+                        if valid_indices[prev_index] != current_index:
+                            break
+                        prev_index -= 1
+                    if prev_index >= 0:
+                        current_index = prev_index
                         gif_frame_idx = 0
                         gif_elapsed = 0
-                        if video_cap is not None:
+                        video_paused = False
+                        video_start_time = pygame.time.get_ticks()
+                        last_video_frame = None
+                        if audio_playing:
+                            pygame.mixer.music.stop()
+                            audio_playing = False
+                        if video_cap:
                             video_cap.release()
                             video_cap = None
-                        if audio_clip is not None:
-                            audio_clip.close()
-                            audio_clip = None
                 elif event.key == pygame.K_f:
                     if screen.get_flags() & pygame.FULLSCREEN:
                         pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
                     else:
                         pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
                 elif event.key == pygame.K_SPACE:
-                    if media_types[current_index] == "mp4":
+                    if media_types[valid_indices[current_index]] == "mp4":
                         video_paused = not video_paused
-                        # Pause/resume audio
-                        if audio_clip is not None:
-                            if video_paused:
-                                audio_clip.reader.close_proc()
-                            else:
-                                # Restart audio from current frame position
-                                # Not perfect sync, but resumes audio
-                                audio_clip.preview(audio=True, video=False)
+                        if video_paused:
+                            if audio_playing:
+                                pygame.mixer.music.pause()
+                        else:
+                            if audio_playing:
+                                pygame.mixer.music.unpause()
 
-        media_type = media_types[current_index]
+        actual_index = valid_indices[current_index]
+        media_type = media_types[actual_index]
+        
         if media_type == "gif":
-            # Handle GIF animation
-            frames, durations = gif_infos[current_index]
+            frames, durations = gif_infos[actual_index]
             gif_elapsed += dt
             if gif_elapsed >= durations[gif_frame_idx]:
                 gif_elapsed = 0
                 gif_frame_idx = (gif_frame_idx + 1) % len(frames)
             current_image = frames[gif_frame_idx]
-            # Draw GIF frame
             screen.fill((0, 0, 0))
             img_width, img_height = current_image.get_size()
             x_pos = (screen_width - img_width) // 2
             y_pos = (screen_height - img_height) // 2
             screen.blit(current_image, (x_pos, y_pos))
             pygame.display.flip()
+            
         elif media_type == "mp4":
+            video_path = video_paths[actual_index]
+            audio_path = audio_files[actual_index]
+            
             if video_cap is None:
-                video_cap = cv2.VideoCapture(video_paths[current_index])
+                logging.info(f"Opening video: {video_path}")
+                video_cap = cv2.VideoCapture(video_path)
                 if not video_cap.isOpened():
-                    print(f"Failed to open video: {video_paths[current_index]}")
-                    current_index += 1
-                    if video_cap is not None:
-                        video_cap.release()
-                        video_cap = None
-                    if audio_clip is not None:
-                        audio_clip.close()
-                        audio_clip = None
+                    logging.error(f"Failed to open video: {video_path}")
+                    # Move to next valid media
+                    current_index = min(current_index + 1, len(valid_indices) - 1)
                     continue
-                video_fps = video_cap.get(cv2.CAP_PROP_FPS) or 30
-                video_frame_time = 1000 / video_fps
-                video_next_frame_time = pygame.time.get_ticks()
-                video_paused = False
-                # Start audio playback
-                if audio_clip is not None:
-                    audio_clip.close()
-                audio_clip = VideoFileClip(video_paths[current_index])
-                audio_clip.audio.preview()  # Play audio in a separate thread
-
+                
+                # Get video properties
+                fps = video_cap.get(cv2.CAP_PROP_FPS)
+                if fps <= 0:
+                    fps = 30
+                frame_delay = 1000 / fps
+                
+                # Try to load audio if available
+                if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
+                    try:
+                        logging.info(f"Loading audio: {audio_path}")
+                        pygame.mixer.music.load(audio_path)
+                        pygame.mixer.music.play()
+                        audio_playing = True
+                    except Exception as e:
+                        logging.error(f"Failed to play audio: {e}")
+                        audio_playing = False
+                else:
+                    logging.warning(f"No audio file found for {video_path}")
+                    audio_playing = False
+                
+                video_start_time = pygame.time.get_ticks()
+            
             if not video_paused:
-                now = pygame.time.get_ticks()
-                # Only process if it's time for the next frame
-                if now >= video_next_frame_time:
-                    # Calculate how many frames we need to advance
-                    frames_to_advance = 1
-                    # If we're behind, skip frames to catch up
-                    if now > video_next_frame_time + video_frame_time:
-                        frames_to_advance = min(
-                            10,  # Limit to 10 frames max to avoid large jumps
-                            int((now - video_next_frame_time) / video_frame_time)
-                        )
-                    
-                    # Skip frames if needed
-                    for _ in range(frames_to_advance - 1):
-                        if not video_cap.grab():
-                            break
-                    
-                    # Read the current frame
-                    ret, frame = video_cap.read()
-                    if not ret:
-                        # End of video handling
-                        video_cap.release()
-                        video_cap = None
-                        current_index += 1
-                        if current_index >= len(scaled_images):
-                            running = False
-                        continue
-                    
-                    # Update timing for next frame
-                    video_next_frame_time += frames_to_advance * video_frame_time
-                    
-                    # Process and display frame
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    h, w, _ = frame.shape
-                    scale_factor = min(1.0, min(screen_width / w, screen_height / h))
-                    new_width = int(w * scale_factor)
-                    new_height = int(h * scale_factor)
-                    frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
-                    surf = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
-                    
+                ret, frame = video_cap.read()
+                if not ret:
+                    # End of video, move to next
+                    logging.info(f"End of video: {video_path}")
+                    video_cap.release()
+                    video_cap = None
+                    if audio_playing:
+                        pygame.mixer.music.stop()
+                        audio_playing = False
+                    current_index = min(current_index + 1, len(valid_indices) - 1)
+                    continue
+                
+                # Process and display frame
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                h, w, _ = frame.shape
+                scale_factor = min(1.0, min(screen_width / w, screen_height / h))
+                new_width = int(w * scale_factor)
+                new_height = int(h * scale_factor)
+                frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                
+                # Convert to Pygame surface
+                surf = pygame.surfarray.make_surface(frame)
+                surf = pygame.transform.rotate(surf, -90)  # Correct orientation
+                
+                screen.fill((0, 0, 0))
+                x_pos = (screen_width - new_width) // 2
+                y_pos = (screen_height - new_height) // 2
+                screen.blit(surf, (x_pos, y_pos))
+                pygame.display.flip()
+                
+                # Save for pause state
+                last_video_frame = surf
+                last_video_pos = (x_pos, y_pos)
+            else:
+                # Show last frame when paused
+                if last_video_frame:
                     screen.fill((0, 0, 0))
-                    x_pos = (screen_width - new_width) // 2
-                    y_pos = (screen_height - new_height) // 2
-                    screen.blit(surf, (x_pos, y_pos))
+                    screen.blit(last_video_frame, last_video_pos)
                     pygame.display.flip()
-        else:
-            # Static image
-            current_image = scaled_images[current_index]
-            screen.fill((0, 0, 0))
-            img_width, img_height = current_image.get_size()
-            x_pos = (screen_width - img_width) // 2
-            y_pos = (screen_height - img_height) // 2
-            screen.blit(current_image, (x_pos, y_pos))
-            pygame.display.flip()
+                
+        else:  # Static image
+            current_image = scaled_images[actual_index]
+            if current_image:
+                screen.fill((0, 0, 0))
+                img_width, img_height = current_image.get_size()
+                x_pos = (screen_width - img_width) // 2
+                y_pos = (screen_height - img_height) // 2
+                screen.blit(current_image, (x_pos, y_pos))
+                pygame.display.flip()
 
-    if video_cap is not None:
+    # Clean up
+    if video_cap:
         video_cap.release()
-    if audio_clip is not None:
-        audio_clip.close()
+    if audio_playing:
+        pygame.mixer.music.stop()
     pygame.quit()
-    return
+    
+    # Clean up audio files
+    for audio_file in audio_files:
+        if audio_file and os.path.exists(audio_file):
+            try:
+                os.unlink(audio_file)
+            except Exception as e:
+                logging.error(f"Error deleting audio file {audio_file}: {e}")
+    
+    logging.info("Media viewer closed")
