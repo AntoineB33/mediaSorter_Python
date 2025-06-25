@@ -277,6 +277,7 @@ class SpreadsheetModel(QAbstractTableModel):
                             self.signal.emit({"type": "input_text_changed", "value": self._collections.collectionName})
                             self.save_to_file()
 
+    # TODO: have a thread just to stack instructions
     async def add_task(self, task_object):
         with self.condition:
             task_type = task_object.task_type
