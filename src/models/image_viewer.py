@@ -374,7 +374,8 @@ def show_images(self, image_paths):
                 
                 # Convert to Pygame surface
                 surf = pygame.surfarray.make_surface(frame)
-                surf = pygame.transform.rotate(surf, -90)  # Correct orientation
+                surf = pygame.transform.rotate(surf, -90)
+                surf = pygame.transform.flip(surf, True, False)
                 
                 screen.fill((0, 0, 0))
                 x_pos = (screen_width - new_width) // 2
