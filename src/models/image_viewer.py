@@ -30,7 +30,7 @@ def get_ffmpeg_path():
         script_dir = os.path.dirname(os.path.abspath(__file__))
         bin_dir = os.path.join(script_dir, "bin")
         ffmpeg_path = os.path.join(bin_dir, "ffmpeg.exe")
-        
+
         if os.path.exists(ffmpeg_path):
             logging.info(f"FFmpeg found in local bin directory: {ffmpeg_path}")
             return ffmpeg_path
@@ -113,6 +113,8 @@ def show_images(self, image_paths):
     # Create borderless window
     screen = pygame.display.set_mode((screen_width, screen_height), pygame.NOFRAME)
     pygame.display.set_caption("Image Viewer")
+
+    VIDEO_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov", ".flv", ".webm"]
     
     # Load media
     scaled_images = []
@@ -146,10 +148,10 @@ def show_images(self, image_paths):
                 media_types.append("image")
                 video_paths.append(None)
                 audio_files.append(None)
-        elif ext == ".mp4":
+        elif ext in VIDEO_EXTENSIONS:  # Now checks against all video extensions
             scaled_images.append(None)
             gif_infos.append(None)
-            media_types.append("mp4")
+            media_types.append("video")
             video_paths.append(path)
             
             # Create temporary audio file
@@ -213,7 +215,7 @@ def show_images(self, image_paths):
 
     # Filter valid media
     valid_indices = [i for i, media in enumerate(media_types) 
-                   if media == "mp4" or (media == "image" and scaled_images[i]) or (media == "gif" and gif_infos[i])]
+                   if media == "video" or (media == "image" and scaled_images[i]) or (media == "gif" and gif_infos[i])]
     if not valid_indices:
         logging.error("No valid media to display")
         print("No valid media to display")
@@ -288,7 +290,7 @@ def show_images(self, image_paths):
                     else:
                         pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
                 elif event.key == pygame.K_SPACE:
-                    if media_types[valid_indices[current_index]] == "mp4":
+                    if media_types[valid_indices[current_index]] == "video":
                         video_paused = not video_paused
                         if video_paused:
                             if audio_playing:
@@ -314,7 +316,7 @@ def show_images(self, image_paths):
             screen.blit(current_image, (x_pos, y_pos))
             pygame.display.flip()
             
-        elif media_type == "mp4":
+        elif media_type == "video":
             video_path = video_paths[actual_index]
             audio_path = audio_files[actual_index]
             
