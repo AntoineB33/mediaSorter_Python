@@ -131,11 +131,8 @@ class SpreadsheetModel(QAbstractTableModel):
         asyncio.set_event_loop(loop)
         loop.run_until_complete(coro)
         loop.close()
-
-    async def add_task(self, task_object):
-        with self.condition:
-            task_type = task_object.task_type
-            collectionName = task_object.collectionName
+    
+    async def _add_task(self, task_object, task_type, collectionName):
             match task_type:
                 case TaskTypes.CHECKINGS:
                     for i, task in enumerate(self._collections.checkings_list[1:], start=1):
@@ -228,14 +225,6 @@ class SpreadsheetModel(QAbstractTableModel):
                         self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
                         index = self.index(row, col)
                         self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
-                        if self._collections.checkings_list and self._collections.checkings_list[0].collectionName == collectionName:
-                            self._collections.checkings_list[0].id = random.random()
-                        else:
-                            for i, task in enumerate(self._collections.checkings_list):
-                                if task.collectionName == collectionName:
-                                    del self._collections.checkings_list[i]
-                                    return
-                            self._collections.checkings_list.insert(bool(self._collections.checkings_list), task_object)
                         self.save_to_file()
                         asyncio.create_task(self.add_task(AsyncTask(TaskTypes.CHECKINGS, collectionName)))
                 case TaskTypes.SET_COLLECTION_NAME:
@@ -287,6 +276,12 @@ class SpreadsheetModel(QAbstractTableModel):
                                 self.endResetModel()
                             self.signal.emit({"type": "input_text_changed", "value": self._collections.collectionName})
                             self.save_to_file()
+
+    async def add_task(self, task_object):
+        with self.condition:
+            task_type = task_object.task_type
+            collectionName = task_object.collectionName
+            await self._add_task(task_object, task_type, collectionName)
             self.condition.notify_all()
      
     @Slot(result=str)
@@ -412,7 +407,8 @@ class SpreadsheetModel(QAbstractTableModel):
 
     def setData(self, index, value, role=Qt.EditRole):
         if role == Qt.EditRole and index.isValid():
-            asyncio.create_task(self.add_task(AsyncTask(TaskTypes.SET_DATA, row = index.row(), column = index.column(), value=value)))
+            asyncio.create_task(self.add_task(AsyncTask(TaskTypes.SET_DATA, collectionName = self._collections.collectionName
+                                                        , row = index.row(), column = index.column(), value=value)))
             return True
         return False
 
