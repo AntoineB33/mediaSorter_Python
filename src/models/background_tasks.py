@@ -18,8 +18,8 @@ async def checkings_thread(self):
             while not self._collections.checkings_list:
                 self.condition.wait()
             task = self._collections.checkings_list[0]
-        data = self._collections.collections[task.collectionName].data
-        roles = self._collections.collections[task.collectionName].roles
+        data = self.collections[task.collectionName].data
+        roles = self.collections[task.collectionName].roles
         res = find_valid_sortings(data, roles)
         if type(res) is str:
             self._errorMsg = res
@@ -42,8 +42,8 @@ async def sortings_thread(self):
             task = self._collections.sortings_list[0]
             collectionName = task.collectionName
             task_id = task.id
-        data = self._collections.collections[collectionName].data
-        roles = self._collections.collections[collectionName].roles
+        data = self.collections[collectionName].data
+        roles = self.collections[collectionName].roles
         res = find_valid_sortings(data, roles)
         async with self._data_lock:
             if self._collections.sortings_list[0][1] != task_id:
@@ -63,7 +63,7 @@ async def sortings_thread(self):
                 except ValueError:
                     pass
                 if res[0] != list(range(len(data))):
-                    if collectionName == self._collections.collectionName:
+                    if collectionName == self.collectionName:
                         self.beginResetModel()
                         self._data = [data[i] for i in res[0]]
                         for r in self._data:

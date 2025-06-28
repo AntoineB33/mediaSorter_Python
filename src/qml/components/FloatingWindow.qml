@@ -98,7 +98,7 @@ Rectangle {
                 rightPadding: 40
                 color: "#333333"
                 selectionColor: "#2196F3"
-                text: spreadsheetModel.get_collectionName()
+                text: spreadsheetModel.getCollectionName()
 
                 cursorDelegate: Rectangle {
                     visible: inputField.cursorVisible
@@ -240,7 +240,10 @@ Rectangle {
 
             Button {
                 text: "Sort"
-                onClicked: spreadsheetModel.sortButton(false)
+                onClicked: function() {
+                    text = "Stop Sorting";
+                    spreadsheetModel.sortButton(false);
+                }
             }
 
             Button {
