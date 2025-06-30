@@ -11,7 +11,3 @@ class collectionElement:
 class collection:
     # Implementation
     pass
-
-class AsyncTask:
-    # Implementation
-    pass

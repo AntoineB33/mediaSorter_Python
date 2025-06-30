@@ -1,25 +1,27 @@
 import asyncio
 import random
-from .data_structures import AsyncTask, TaskTypes
+from .data_structures import TaskTypes
 import re
+import threading
 
 
-async def checkings_thread(self):
+def checkings_thread(self):
     global find_valid_sortings
     from models.generate_sortings import find_valid_sortings
     self.imports_loaded.set()
     firstIteration = True
     while True:
-        task = None
         with self.condition:
             if not firstIteration:
-                del self._collections.checkings_list[0]
+                with self._data_lock:
+                    del self.checkings_list[0]
             firstIteration = False
-            while not self._collections.checkings_list:
+            while not self.checkings_list:
                 self.condition.wait()
-            task = self._collections.checkings_list[0]
-        data = self.collections[task.collectionName].data
-        roles = self.collections[task.collectionName].roles
+            with self._data_lock:
+                task = self.checkings_list[0]
+        data = self.collections[task["collectionName"]].data
+        roles = self.collections[task["collectionName"]].roles
         res = find_valid_sortings(data, roles)
         if type(res) is str:
             self._errorMsg = res
@@ -29,24 +31,25 @@ async def checkings_thread(self):
                 self._errorMsg = ""
                 self.signal.emit({"type": "FloatingWindow_text_changed", "value": ""})
 
-async def sortings_thread(self):
+def sortings_thread(self):
     self.imports_loaded.wait()
     firstIteration = True
     while True:
         with self.condition:
             if not firstIteration:
-                del self._collections.checkings_list[0]
+                with self._data_lock:
+                    del self.sorting_list[0]
             firstIteration = False
-            while not self._collections.checkings_list:
+            while not self.sortings_list:
                 self.condition.wait()
-            task = self._collections.sortings_list[0]
-            collectionName = task.collectionName
-            task_id = task.id
+            task = self.sortings_list[0]
+            collectionName = task["collectionName"]
+            task_id = task["id"]
         data = self.collections[collectionName].data
         roles = self.collections[collectionName].roles
         res = find_valid_sortings(data, roles)
-        async with self._data_lock:
-            if self._collections.sortings_list[0][1] != task_id:
+        with self._data_lock:
+            if self.sortings_list[0][1] != task_id:
                 continue
             if type(res) is str:
                 for e in self._errorMsg:
@@ -87,5 +90,7 @@ async def sortings_thread(self):
 
 
 def setup_background_tasks(model):
-    model._executor.submit(model.run_async, checkings_thread(model))
-    model._executor.submit(model.run_async, sortings_thread(model))
+    thread = threading.Thread(target=checkings_thread, args=(model,))
+    thread.start()
+    thread = threading.Thread(target=sortings_thread, args=(model,))
+    thread.start()

@@ -65,6 +65,13 @@ Rectangle {
         id: columnLayout
         spacing: 20
 
+        Text {
+            id: errorText
+            text: ""
+            color: "red"
+            visible: text.length > 0
+        }
+
         RowLayout {
             spacing: 10
             Layout.alignment: Qt.AlignHCenter
@@ -242,13 +249,13 @@ Rectangle {
                 text: "Sort"
                 onClicked: function() {
                     text = "Stop Sorting";
-                    spreadsheetModel.sortButton(false);
+                    spreadsheetModel.sortButton(true);
                 }
             }
 
             Button {
                 text: "Calculate"
-                onClicked: spreadsheetModel.sortButton(true)
+                onClicked: spreadsheetModel.sortButton(false)
             }
         }
 
@@ -276,13 +283,6 @@ Rectangle {
             onActivated: (index) => {
                 spreadsheetModel.setColumnRole(index)
             }
-        }
-
-        Text {
-            id: errorText
-            text: ""
-            color: "red"
-            visible: text.length > 0
         }
     }
 }

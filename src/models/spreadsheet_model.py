@@ -27,7 +27,7 @@ import random
 import pickle
 from concurrent.futures import ThreadPoolExecutor
 import os
-from .data_structures import TaskTypes, collectionElement, collection, AsyncTask
+from .data_structures import TaskTypes, collectionElement, collection
 from .background_tasks import setup_background_tasks
 from .image_viewer import show_images
 
@@ -55,19 +55,8 @@ class collection:
         self.sortings_list = []
         self.collectionName = ""
 
-class AsyncTask:
-    def __init__(self, task_type = None, collectionName = None, row = None, column = None, value = None, onlyCalculate=False):
-        self.task_type = task_type
-        self.collectionName = collectionName
-        self.row = row
-        self.column = column
-        self.value = value
-        self.onlyCalculate = onlyCalculate
-        self.id = random.random()
-
 class SpreadsheetModel(QAbstractTableModel):
     signal = Signal(dict)
-    imports_loaded = threading.Event()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -78,7 +67,6 @@ class SpreadsheetModel(QAbstractTableModel):
         self.font = QFont("Arial", 10)
 
         self.metrics = QFontMetrics(self.font)
-        self.condition = threading.Condition()
         self._rows_nb = 0
         self._columns_nb = 0
         self._errorMsg = ""
@@ -91,16 +79,14 @@ class SpreadsheetModel(QAbstractTableModel):
         self._tableViewContentX = 0
         self._tableViewWidth = 0
         self._data_lock = threading.Lock()
+        self.condition = threading.Condition(self._data_lock)
+        self.imports_loaded = threading.Event()
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._selected_row = -1
         self._selected_column = -1
         self._role_types = [RoleTypes.NAMES, RoleTypes.DEPENDENCIES, RoleTypes.ATTRIBUTES, RoleTypes.PATH]
-    
-    @Slot(result=list)
-    def get_role_types(self):
-        return self._role_types
-            
-    async def initialize(self):
+
+        
         if not Path("data").exists():
             Path("data").mkdir(parents=True, exist_ok=True)
         try:
@@ -114,7 +100,15 @@ class SpreadsheetModel(QAbstractTableModel):
             self.collectionName = self._getDefaultSpreadsheetName()
             self.createCollection(self.collectionName)
         self.collections = self._collections.collections
+        self.checkings_list = self._collections.checkings_list
+        self.sortings_list = self._collections.sortings_list
+        
+    def start_background_tasks(self):
         setup_background_tasks(self)
+    
+    @Slot(result=list)
+    def get_role_types(self):
+        return self._role_types
      
     @Slot(result=str)
     def get_font_family(self):
@@ -158,7 +152,7 @@ class SpreadsheetModel(QAbstractTableModel):
     def _getDefaultSpreadsheetName(self):
         """Generate a default spreadsheet name not already used."""
         i = 1
-        while f"Default_{i}" in self.collections:
+        while f"Default_{i}" in self._collections.collections:
             i += 1
         return f"Default_{i}"
 
@@ -169,13 +163,13 @@ class SpreadsheetModel(QAbstractTableModel):
                 return
             self.collections[name] = self._collection
             del self.collections[self.collectionName]
-            for i, task in enumerate(self._collections.checkings_list):
-                if task.collectionName == self.collectionName:
-                    self._collections.checkings_list[i].collectionName = task.collectionName
+            for i, task in enumerate(self.checkings_list):
+                if task["collectionName"] == self.collectionName:
+                    self.checkings_list[i].collectionName = task["collectionName"]
                     return
-            for i, task in enumerate(self._collections.sortings_list):
-                if task.collectionName == self.collectionName:
-                    self._collections.sortings_list[i].collectionName = task.collectionName
+            for i, task in enumerate(self.sortings_list):
+                if task["collectionName"] == self.collectionName:
+                    self.sortings_list[i].collectionName = task["collectionName"]
                     return
             self.collectionName = name
             self._collections.collectionName = name
@@ -197,6 +191,7 @@ class SpreadsheetModel(QAbstractTableModel):
             self._roles = self._collection.roles
             self._rowHeights = self._collection.rowHeights
             self._columnWidths = self._collection.columnWidths
+            self.collections = self._collections.collections
             self.endResetModel()
             self.save_to_file()
 
@@ -235,21 +230,22 @@ class SpreadsheetModel(QAbstractTableModel):
             self.beginResetModel()
             self.collectionName = name
             self._collection = collection
-            self._data = self._collection.data
-            self._roles = self._collection.roles
-            self._rowHeights = self._collection.rowHeights
-            self._columnWidths = self._collection.columnWidths
+            self._data = collection.data
+            self._roles = collection.roles
+            self._rowHeights = collection.rowHeights
+            self._columnWidths = collection.columnWidths
             self.endResetModel()
-            for i, task in enumerate(self._collections.checkings_list[1:], start=1):
-                if task.collectionName == name:
-                    self._collections.checkings_list.insert(1, task)
-                    del self._collections.checkings_list[i+1]
-                    break
-            for i, task in enumerate(self._collections.sortings_list[1:], start=1):
-                if task.collectionName == name:
-                    self._collections.sortings_list.insert(1, task)
-                    del self._collections.sortings_list[i+1]
-                    break
+            with self._data_lock:
+                for i, task in enumerate(self._collections.checkings_list[1:], start=1):
+                    if task["collectionName"] == name:
+                        self._collections.checkings_list.insert(1, task)
+                        del self._collections.checkings_list[i+1]
+                        break
+                for i, task in enumerate(self._collections.sortings_list[1:], start=1):
+                    if task["collectionName"] == name:
+                        self._collections.sortings_list.insert(1, task)
+                        del self._collections.sortings_list[i+1]
+                        break
             return True
         else:
             self.signal.emit({"type": "input_text_changed", "value": self.collectionName})
@@ -295,13 +291,15 @@ class SpreadsheetModel(QAbstractTableModel):
         return None
 
     def _appendChecking(self):
-        for i, task in enumerate(self._collections.checkings_list[1:], start=1):
-            if task.collectionName == self.collectionName:
-                del self._collections.checkings_list[i]
-                return
-        task_object = AsyncTask(collectionName = self.collectionName)
-        self._collections.checkings_list.insert(bool(self._collections.checkings_list), task_object)
-        self.save_to_file()
+        with self.condition:
+            for i, task in enumerate(self.checkings_list[1:], start=1):
+                if task["collectionName"] == self.collectionName:
+                    del self.checkings_list[i]
+                    return
+            task_object = {"collectionName": self.collectionName, "id": random.random()}
+            self.checkings_list.insert(bool(self.checkings_list), task_object)
+            self.condition.notify_all()
+            self.save_to_file()
 
     def setData(self, index: QModelIndex, value, role=Qt.EditRole):
         if role == Qt.EditRole and index.isValid():
@@ -479,13 +477,17 @@ class SpreadsheetModel(QAbstractTableModel):
             pickle.dump(self._collections, f)
     
     @Slot(bool)
-    def sortButton(self, onlyCalculate):
-        for i, task in enumerate(self._collections.sortings_list):
-            if task.collectionName == self.collectionName:
-                del self._collections.sortings_list[i]
-                return
-        task_object = AsyncTask(collectionName = self.collectionName, onlyCalculate=onlyCalculate)
-        self._collections.sortings_list.insert(bool(self._collections.sortings_list), task_object)
+    def sortButton(self, reorder):
+        with self.condition:
+            for i, task in enumerate(self._collections.sortings_list):
+                if task["collectionName"] == self.collectionName:
+                    del self._collections.sortings_list[i]
+                    return
+            task_object = {"collectionName": self.collectionName, "id": random.random(), "reorder": reorder}
+            self._collections.sortings_list.insert(bool(self._collections.sortings_list), task_object)
+            self.condition.notify_all()
+            with self._data_lock:
+                self.save_to_file()
     
     @Slot(int)
     def setColumnRole(self, ind):
@@ -496,19 +498,21 @@ class SpreadsheetModel(QAbstractTableModel):
             index = self.index(0, self._selected_column)
             index2 = self.index(self._rows_nb - 1, self._selected_column)
             self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
-            self._appendChecking()
+            with self._data_lock:
+                self._appendChecking()
     
     @Slot()
     def showButton(self):
-        url_col = self._roles.index(RoleTypes.PATH) if RoleTypes.PATH in self._roles else -1
-        if url_col != -1:
-            if not os.path.exists(MEDIA_ROOT):
-                os.makedirs(MEDIA_ROOT)
-            show_images(self, [
-                os.path.join(MEDIA_ROOT, self._data[i][url_col])
-                for i in range(len(self._data))
-                if self._data[i][url_col] and os.path.exists(os.path.join(MEDIA_ROOT, self._data[i][url_col]))
-            ])
+        with self._data_lock:
+            url_col = self._roles.index(RoleTypes.PATH) if RoleTypes.PATH in self._roles else -1
+            if url_col != -1:
+                if not os.path.exists(MEDIA_ROOT):
+                    os.makedirs(MEDIA_ROOT)
+                show_images(self, [
+                    os.path.join(MEDIA_ROOT, self._data[i][url_col])
+                    for i in range(len(self._data))
+                    if self._data[i][url_col] and os.path.exists(os.path.join(MEDIA_ROOT, self._data[i][url_col]))
+                ])
     
     # def _updateCells(self, index1, index2, roles):
     #     if index1.row() == 0:

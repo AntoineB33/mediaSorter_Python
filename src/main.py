@@ -18,30 +18,22 @@ async def main():
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
 
-    model = SpreadsheetModel()
-    await model.initialize()
-    
     engine = QQmlApplicationEngine()
-    
-    # 1. Set context property FIRST
-    engine.rootContext().setContextProperty("spreadsheetModel", model)
-
-    
-    # 2. Configure paths AFTER setting context
     current_dir = Path(__file__).parent
     qml_dir = current_dir / "qml"
     engine.addImportPath(str(qml_dir))
     
-    # 3. Load QML LAST
+    # Create model BEFORE loading QML
+    model = SpreadsheetModel()
+    engine.rootContext().setContextProperty("spreadsheetModel", model)
+    
     qml_file = qml_dir / "main.qml"
     engine.load(QUrl.fromLocalFile(str(qml_file)))
     
-    # Clean exit if load fails
     if not engine.rootObjects():
         sys.exit(-1)
-    
-    # Connect save handler
-    # app.aboutToQuit.connect(model.save_to_file)
+        
+    model.start_background_tasks()
 
     with loop:
         sys.exit(loop.run_forever())
