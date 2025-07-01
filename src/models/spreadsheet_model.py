@@ -537,3 +537,25 @@ class SpreadsheetModel(QAbstractTableModel):
             else:
                 role_combo = self._role_types.index(RoleTypes.NAMES)
             self.signal.emit({"type": "selected_cell_changed", "value": role_combo})
+
+    
+    @Slot(int, int, list)
+    def setBlockData(self, start_row, start_col, data):
+        """Set a block of cells starting at given position"""
+        if not data:
+            return
+
+        for r, row_data in enumerate(data):
+            for c, value in enumerate(row_data):
+                self.setData(
+                    self.index(start_row + r, start_col + c),
+                    value,
+                    Qt.EditRole
+                )
+
+        max_cols = max(len(row) for row in data)
+        top_left = self.index(start_row, start_col)
+        bottom_right = self.index(start_row + len(data) - 1, start_col + max_cols - 1)
+        self.dataChanged.emit(top_left, bottom_right, [Qt.DisplayRole])
+            
+        self._appendChecking()

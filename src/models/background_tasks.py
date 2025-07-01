@@ -13,13 +13,11 @@ def checkings_thread(self):
     while True:
         with self.condition:
             if not firstIteration:
-                with self._data_lock:
-                    del self.checkings_list[0]
+                del self.checkings_list[0]
             firstIteration = False
             while not self.checkings_list:
                 self.condition.wait()
-            with self._data_lock:
-                task = self.checkings_list[0]
+            task = self.checkings_list[0]
         data = self.collections[task["collectionName"]].data
         roles = self.collections[task["collectionName"]].roles
         res = find_valid_sortings(data, roles)
@@ -37,8 +35,7 @@ def sortings_thread(self):
     while True:
         with self.condition:
             if not firstIteration:
-                with self._data_lock:
-                    del self.sorting_list[0]
+                del self.sorting_list[0]
             firstIteration = False
             while not self.sortings_list:
                 self.condition.wait()

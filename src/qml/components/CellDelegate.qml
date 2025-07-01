@@ -36,6 +36,39 @@ Rectangle {
         rightPadding: cell.verticalPadding
         visible: !cell.editing
         font: cell.cellFont
+        Keys.onPressed: (event) => {
+            check_for_pasting(event)
+        }
+    }
+
+    function check_for_pasting(event) {
+        if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
+            event.accepted = true
+            Qt.callLater(function() {
+                var clipboardText = ClipboardHelper.getText()
+                if (clipboardText) {
+                    // Parse clipboard data
+                    var rows = clipboardText.split(/\r\n|\n|\r/)
+                    var data = []
+                    for (var i = 0; i < rows.length; i++) {
+                        if (rows[i]) { // Skip empty lines
+                            data.push(rows[i].split('\t'))
+                        }
+                    }
+                    console.log("Pasting data:", data)
+                    
+                    // Handle single cell paste
+                    if (data.length === 1 && data[0].length === 1) {
+                        editor.insert(editor.cursorPosition, data[0][0])
+                    } 
+                    // Handle multi-cell paste
+                    else if (data.length > 0) {
+                        editor.finishEditing()
+                        spreadsheetModel.setBlockData(row, column, data)
+                    }
+                }
+            })
+        }
     }
 
     TextEdit {
@@ -60,6 +93,7 @@ Rectangle {
                 finishEditing()
                 event.accepted = true
             }
+            check_for_pasting(event)
         }
         
         onTextChanged: {

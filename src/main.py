@@ -9,6 +9,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from models.spreadsheet_model import SpreadsheetModel
 from qasync import QEventLoop, asyncSlot
 import asyncio
+from models.clipboard_helper import ClipboardHelper
 
 
 async def main():
@@ -26,6 +27,8 @@ async def main():
     # Create model BEFORE loading QML
     model = SpreadsheetModel()
     engine.rootContext().setContextProperty("spreadsheetModel", model)
+    clipboard_helper = ClipboardHelper()
+    engine.rootContext().setContextProperty("ClipboardHelper", clipboard_helper)
     
     qml_file = qml_dir / "main.qml"
     engine.load(QUrl.fromLocalFile(str(qml_file)))
