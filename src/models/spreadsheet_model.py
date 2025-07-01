@@ -361,7 +361,7 @@ class SpreadsheetModel(QAbstractTableModel):
                 self.horizontalScroll(self._horizontalScrollPosition, self._horizontalScrollSize, self._tableViewContentX, self._tableViewWidth)
                 index = self.index(row, col)
                 self.dataChanged.emit(index, index, [Qt.EditRole, Qt.DisplayRole])
-                self._appendChecking()
+            self._appendChecking()
             return True
         return False
 
@@ -498,8 +498,7 @@ class SpreadsheetModel(QAbstractTableModel):
             index = self.index(0, self._selected_column)
             index2 = self.index(self._rows_nb - 1, self._selected_column)
             self.dataChanged.emit(index, index2, [Qt.BackgroundRole])
-            with self._data_lock:
-                self._appendChecking()
+            self._appendChecking()
     
     @Slot()
     def showButton(self):
