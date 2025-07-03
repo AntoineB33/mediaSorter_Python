@@ -26,7 +26,7 @@ def checkings_thread(self):
             self.signal.emit({"type": "FloatingWindow_text_changed", "value": res})
         else:
             if self._errorMsg:
-                self._errorMsg = ""
+                self._errorMsg = []
                 self.signal.emit({"type": "FloatingWindow_text_changed", "value": ""})
 
 def sortings_thread(self):
@@ -46,7 +46,7 @@ def sortings_thread(self):
         roles = self.collections[collectionName].roles
         res = find_valid_sortings(data, roles)
         with self._data_lock:
-            if self.sortings_list[0][1] != task_id:
+            if self.sortings_list[0]["id"] != task_id:
                 continue
             if type(res) is str:
                 for e in self._errorMsg:
@@ -57,12 +57,10 @@ def sortings_thread(self):
                     self._errorMsg.append([collectionName, res])
                 self.signal.emit({"type": "FloatingWindow_text_changed", "value": "\n".join([" : ".join(e) for e in self._errorMsg])})
             else:
-                try:
-                    self._errorMsg.remove(e)
+                new_errorMsg = filter(lambda x: x[0] != collectionName, self._errorMsg)
+                if new_errorMsg != self._errorMsg:
                     self.signal.emit({"type": "FloatingWindow_text_changed", "value": "\n".join([" : ".join(e) for e in self._errorMsg])})
-                except ValueError:
-                    pass
-                if res[0] != list(range(len(data))):
+                if task["reorder"] and res[0] != list(range(len(data))):
                     if collectionName == self.collectionName:
                         self.beginResetModel()
                         self._data = [data[i] for i in res[0]]

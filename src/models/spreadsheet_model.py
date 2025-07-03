@@ -69,7 +69,7 @@ class SpreadsheetModel(QAbstractTableModel):
         self.metrics = QFontMetrics(self.font)
         self._rows_nb = 0
         self._columns_nb = 0
-        self._errorMsg = ""
+        self._errorMsg = []
         self._verticalScrollPosition = 0
         self._verticalScrollSize = 0
         self._tableViewContentY = 0
@@ -487,8 +487,7 @@ class SpreadsheetModel(QAbstractTableModel):
             task_object = {"collectionName": self.collectionName, "id": random.random(), "reorder": reorder}
             self._collections.sortings_list.insert(bool(self._collections.sortings_list), task_object)
             self.condition.notify_all()
-            with self._data_lock:
-                self.save_to_file()
+            self.save_to_file()
     
     @Slot(int)
     def setColumnRole(self, ind):

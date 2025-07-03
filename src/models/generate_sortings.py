@@ -112,7 +112,7 @@ def find_valid_sortings(table, roles):
         # Attempt to find a cycle to report
         try:
             cycle = next(simple_cycles(graph))  # Get the first cycle
-            cycle_str = ' -> '.join(map(str, cycle)) + f' -> {cycle[0]}'
+            cycle_str = ' -> '.join(map(lambda x: str(x+1), cycle)) + f' -> {cycle[0]}'
             return f"The dependency graph contains a cycle: {cycle_str}"
         except StopIteration:
             return "The dependency graph is not a DAG (unexpected error)."
