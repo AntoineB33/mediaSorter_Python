@@ -18,7 +18,7 @@ def checkings_thread(self):
             while not self.checkings_list:
                 self.condition.wait()
             task = self.checkings_list[0]
-        data = self.collections[task["collectionName"]].data
+        data = self.collections[task["collectionName"]].data[1:]
         roles = self.collections[task["collectionName"]].roles
         res = find_valid_sortings(data, roles)
         if type(res) is str:
@@ -42,7 +42,7 @@ def sortings_thread(self):
             task = self.sortings_list[0]
             collectionName = task["collectionName"]
             task_id = task["id"]
-        data = self.collections[collectionName].data
+        data = self.collections[collectionName].data[1:]
         roles = self.collections[collectionName].roles
         res = find_valid_sortings(data, roles)
         with self._data_lock:

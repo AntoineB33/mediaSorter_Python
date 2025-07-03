@@ -13,7 +13,7 @@ Rectangle {
     property var decoration: spreadsheetModel.data(spreadsheetModel.index(index, 0), Qt.DecorationRole)
     
     Text {
-        text: index + 1
+        text: index
         anchors.centerIn: parent
         font.pixelSize: 12
     }

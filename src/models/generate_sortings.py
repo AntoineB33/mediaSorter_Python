@@ -86,8 +86,8 @@ def find_valid_sortings(table, roles):
     optimization_terms = []
     
     for i in range(n):
-        for i, entry in enumerate(table[i]):
-            if roles[i] == 'dependencies':
+        for c, entry in enumerate(table[i]):
+            if roles[c] == 'dependencies':
                 match = re.match(r'after\s+([1-9][0-9]*)', entry)
                 if match:
                     j = int(match.group(1)) - 1
@@ -102,7 +102,7 @@ def find_valid_sortings(table, roles):
                         if X >= n or X < 0:
                             return f"Invalid optimization term: {entry} in row {i+1}"
                         optimization_terms.append((i, X))
-                    else:
+                    elif entry != "":
                         return f"Invalid entry: {entry} in row {i+1}"
     
     # Check if the dependency graph is a DAG

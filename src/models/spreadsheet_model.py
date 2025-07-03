@@ -334,6 +334,7 @@ class SpreadsheetModel(QAbstractTableModel):
                         self.signal.emit({"type": "selected_cell_changed", "value": self._role_types.index(RoleTypes.ATTRIBUTES)})
                     elif col == len(self._data[0]) - 1 and value == "":
                         removed_col = False
+                        self._data[row][col] = ''
                         for c in range(col, -1, -1):
                             if all(_row[c] == "" for _row in self._data):
                                 removed_col = True
