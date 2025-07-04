@@ -61,27 +61,26 @@ def sortings_thread(self):
                 if new_errorMsg != self._errorMsg:
                     self.signal.emit({"type": "FloatingWindow_text_changed", "value": "\n".join([" : ".join(e) for e in self._errorMsg])})
                 if task["reorder"] and res[0] != list(range(len(data))):
-                    if collectionName == self.collectionName:
-                        self.beginResetModel()
-                        self._data = [data[i] for i in res[0]]
-                        for r in self._data:
-                            for c in r:
-                                match = re.match(r'after\s+([1-9][0-9]*)', c)
+                    self.beginResetModel()
+                    self._data = [data[i] for i in res[0]]
+                    for r in self._data:
+                        for c in r:
+                            match = re.match(r'after\s+([1-9][0-9]*)', c)
+                            if match:
+                                j = int(match.group(1)) - 1
+                                c = re.sub(r'(after\s+)([1-9][0-9]*)', r'\1' + data.index(j), c)
+                            else:
+                                match = re.match(r'as far as possible from (\d+)', c)
                                 if match:
-                                    j = int(match.group(1)) - 1
-                                    c = re.sub(r'(after\s+)([1-9][0-9]*)', r'\1' + data.index(j), c)
-                                else:
-                                    match = re.match(r'as far as possible from (\d+)', c)
-                                    if match:
-                                        X = int(match.group(1)) - 1
-                                        c = re.sub(r'as far as possible from (\d+)', f'as far as possible from {data.index(X)}', c)
-                        for i in range(len(self._data) - 1, -1, -1):
-                            if self._data[i] == [""] * len(self._data[0]):
-                                self._data.pop(i)
-                                self._rowHeights.pop(i)
-                        self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
-                        self.endResetModel()
-                        self.save_to_file()
+                                    X = int(match.group(1)) - 1
+                                    c = re.sub(r'as far as possible from (\d+)', f'as far as possible from {data.index(X)}', c)
+                    for i in range(len(self._data) - 1, -1, -1):
+                        if self._data[i] == [""] * len(self._data[0]):
+                            self._data.pop(i)
+                            self._rowHeights.pop(i)
+                    self.verticalScroll(self._verticalScrollPosition, self._verticalScrollSize, self._tableViewContentY, self._tableViewHeight)
+                    self.endResetModel()
+                    self.save_to_file()
 
 
 def setup_background_tasks(model):
