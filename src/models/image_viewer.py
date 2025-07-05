@@ -304,6 +304,71 @@ def show_images(self, image_paths):
                         else:
                             if audio_playing:
                                 pygame.mixer.music.unpause()
+                    
+                # NEW KEY BINDINGS FOR VIDEO NAVIGATION
+                elif event.key in [pygame.K_4, pygame.K_6, pygame.K_7, pygame.K_9, pygame.K_1, pygame.K_3]:
+                    actual_index = valid_indices[current_index]
+                    media_type = media_types[actual_index]
+                    
+                    if media_type == "video" and video_cap is not None:
+                        current_pos = video_cap.get(cv2.CAP_PROP_POS_MSEC)
+                        fps = video_cap.get(cv2.CAP_PROP_FPS)
+                        frame_duration = 1000 / fps if fps > 0 else 33  # default to 30fps
+                        
+                        # Calculate jump amount based on key
+                        if event.key == pygame.K_4:  # 5 seconds back
+                            jump_ms = -5000
+                        elif event.key == pygame.K_6:  # 5 seconds forward
+                            jump_ms = 5000
+                        elif event.key == pygame.K_7:  # 10 seconds back
+                            jump_ms = -10000
+                        elif event.key == pygame.K_9:  # 10 seconds forward
+                            jump_ms = 10000
+                        elif event.key == pygame.K_1:  # 1 frame back
+                            jump_ms = -frame_duration
+                        elif event.key == pygame.K_3:  # 1 frame forward
+                            jump_ms = frame_duration
+                        
+                        # Calculate new position
+                        new_pos = max(0, current_pos + jump_ms)
+                        
+                        # Set new position
+                        video_cap.set(cv2.CAP_PROP_POS_MSEC, new_pos)
+                        
+                        # Force reading a new frame
+                        ret, frame = video_cap.read()
+                        if ret:
+                            # Process and display frame
+                            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            h, w, _ = frame.shape
+                            scale_factor = min(1.0, min(screen_width / w, screen_height / h))
+                            new_width = int(w * scale_factor)
+                            new_height = int(h * scale_factor)
+                            frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                            
+                            # Convert to Pygame surface
+                            surf = pygame.surfarray.make_surface(frame)
+                            surf = pygame.transform.rotate(surf, -90)
+                            surf = pygame.transform.flip(surf, True, False)
+                            
+                            # Update display
+                            screen.fill((0, 0, 0))
+                            x_pos = (screen_width - new_width) // 2
+                            y_pos = (screen_height - new_height) // 2
+                            screen.blit(surf, (x_pos, y_pos))
+                            pygame.display.flip()
+                            
+                            # Save for pause state
+                            last_video_frame = surf
+                            last_video_pos = (x_pos, y_pos)
+                            
+                            # Update video start time to maintain timing
+                            video_start_time = pygame.time.get_ticks() - new_pos
+                            
+                        # Stop audio if playing since it will be out of sync
+                        if audio_playing:
+                            pygame.mixer.music.stop()
+                            audio_playing = False
 
         actual_index = valid_indices[current_index]
         media_type = media_types[actual_index]
