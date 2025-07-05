@@ -1,6 +1,5 @@
 import asyncio
 import random
-from .data_structures import TaskTypes
 import re
 import threading
 

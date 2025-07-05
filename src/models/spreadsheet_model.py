@@ -27,33 +27,12 @@ import random
 import pickle
 from concurrent.futures import ThreadPoolExecutor
 import os
-from .data_structures import TaskTypes, collectionElement, collection
+from .data_structures import collectionElement, collection, RoleTypes
 from .background_tasks import setup_background_tasks
 from .image_viewer import show_images
 
 SAVE_FILE = "data/general.json"
 MEDIA_ROOT = "data/media"
-
-
-class RoleTypes:
-    NAMES = "names"
-    DEPENDENCIES = "dependencies"
-    ATTRIBUTES = "attributes"
-    PATH = "path"
-
-class collectionElement:
-    def __init__(self, rowHeights, columnWidths):
-        self.data = [["names"]]
-        self.roles = ["names"]
-        self.rowHeights = rowHeights
-        self.columnWidths = columnWidths
-
-class collection:
-    def __init__(self):
-        self.collections = {}
-        self.checkings_list = []
-        self.sortings_list = []
-        self.collectionName = ""
 
 class SpreadsheetModel(QAbstractTableModel):
     signal = Signal(dict)

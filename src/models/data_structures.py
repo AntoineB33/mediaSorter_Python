@@ -1,13 +1,21 @@
 import random
 
-class TaskTypes:
-    # Enum values
-    pass
+class RoleTypes:
+    NAMES = "names"
+    DEPENDENCIES = "dependencies"
+    ATTRIBUTES = "attributes"
+    PATH = "path"
 
 class collectionElement:
-    # Implementation
-    pass
+    def __init__(self, rowHeights, columnWidths):
+        self.data = [["names"]]
+        self.roles = ["names"]
+        self.rowHeights = rowHeights
+        self.columnWidths = columnWidths
 
 class collection:
-    # Implementation
-    pass
+    def __init__(self):
+        self.collections = {}
+        self.checkings_list = []
+        self.sortings_list = []
+        self.collectionName = ""
