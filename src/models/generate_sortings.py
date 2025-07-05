@@ -86,8 +86,11 @@ def find_valid_sortings(table, roles):
     optimization_terms = []
     
     for i in range(n):
-        for c, entry in enumerate(table[i]):
-            if roles[c] == 'dependencies':
+        for c, cell in enumerate(table[i]):
+            if roles[c] != 'dependencies':
+                continue
+            entries = cell.split(';')
+            for entry in entries:
                 match = re.match(r'after\s+([1-9][0-9]*)', entry)
                 if match:
                     j = int(match.group(1)) - 1

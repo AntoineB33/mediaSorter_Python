@@ -35,7 +35,7 @@ def sortings_thread(self):
     while True:
         with self.condition:
             if not firstIteration:
-                del self.sorting_list[0]
+                del self.sortings_list[0]
             firstIteration = False
             while not self.sortings_list:
                 self.condition.wait()
@@ -62,18 +62,16 @@ def sortings_thread(self):
                     self.signal.emit({"type": "FloatingWindow_text_changed", "value": "\n".join([" : ".join(e) for e in self._errorMsg])})
                 if task["reorder"] and res[0] != list(range(len(data))):
                     self.beginResetModel()
-                    self._data = [data[i] for i in res[0]]
-                    for r in self._data:
-                        for c in r:
-                            match = re.match(r'after\s+([1-9][0-9]*)', c)
-                            if match:
-                                j = int(match.group(1)) - 1
-                                c = re.sub(r'(after\s+)([1-9][0-9]*)', r'\1' + data.index(j), c)
-                            else:
-                                match = re.match(r'as far as possible from (\d+)', c)
-                                if match:
-                                    X = int(match.group(1)) - 1
-                                    c = re.sub(r'as far as possible from (\d+)', f'as far as possible from {data.index(X)}', c)
+                    self._data[1:] = [data[i] for i in res[0]]
+                    for r in self._data[1:]:
+                        for colInd, c in enumerate(r):
+                            if roles[colInd] != 'dependencies':
+                                continue
+                            r[colInd] = re.sub(
+                                r'(after\s+|as far as possible from\s+)([1-9][0-9]*)(?=;|$)',
+                                lambda m: m.group(1) + str(res[0].index(int(m.group(2)) - 1) + 1),
+                                c
+                            )
                     for i in range(len(self._data) - 1, -1, -1):
                         if self._data[i] == [""] * len(self._data[0]):
                             self._data.pop(i)

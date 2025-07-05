@@ -312,7 +312,8 @@ class SpreadsheetModel(QAbstractTableModel):
                         self._rowHeights.append(prevHeight + self.rowHeight(-1))
                         self._data.append([""] * (len(self._data[0]) if self._data else 0))
                 elif row == len(self._data) - 1 and value == "":
-                    self._data[row][col] = ""
+                    if col < len(self._data[0]):
+                        self._data[row][col] = ""
                     prev_col_nb = len(self._data[0])
                     for r in range(row, -1, -1):
                         if self._data[r] == [""] * len(self._data[0]):
@@ -334,7 +335,8 @@ class SpreadsheetModel(QAbstractTableModel):
                         self.signal.emit({"type": "selected_cell_changed", "value": self._role_types.index(RoleTypes.ATTRIBUTES)})
                     elif col == len(self._data[0]) - 1 and value == "":
                         removed_col = False
-                        self._data[row][col] = ''
+                        if row < len(self._data):
+                            self._data[row][col] = ''
                         for c in range(col, -1, -1):
                             if all(_row[c] == "" for _row in self._data):
                                 removed_col = True
