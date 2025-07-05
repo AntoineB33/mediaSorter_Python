@@ -212,6 +212,12 @@ def show_images(self, image_paths):
                 media_types.append("image")
                 video_paths.append(None)
                 audio_files.append(None)
+    
+    logging.info("Waiting for audio extraction threads to complete...")
+    for t in audio_threads:
+        if t.is_alive():
+            t.join(5)  # Wait up to 5 seconds for each thread
+    logging.info("All audio extraction threads completed")
 
     # Filter valid media
     valid_indices = [i for i, media in enumerate(media_types) 
