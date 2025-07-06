@@ -304,8 +304,7 @@ def show_images(self, image_paths):
                         else:
                             if audio_playing:
                                 pygame.mixer.music.unpause()
-                    
-                # NEW KEY BINDINGS FOR VIDEO NAVIGATION
+                                
                 elif event.key in [pygame.K_4, pygame.K_6, pygame.K_7, pygame.K_9, pygame.K_1, pygame.K_3]:
                     actual_index = valid_indices[current_index]
                     media_type = media_types[actual_index]
@@ -365,10 +364,17 @@ def show_images(self, image_paths):
                             # Update video start time to maintain timing
                             video_start_time = pygame.time.get_ticks() - new_pos
                             
-                        # Stop audio if playing since it will be out of sync
+                        # Synchronize audio with new position
                         if audio_playing:
-                            pygame.mixer.music.stop()
-                            audio_playing = False
+                            try:
+                                # Get new position in seconds
+                                audio_pos = new_pos / 1000.0
+                                # Stop and restart audio at new position
+                                pygame.mixer.music.stop()
+                                pygame.mixer.music.play(start=audio_pos)
+                            except Exception as e:
+                                logging.error(f"Error syncing audio: {e}")
+                                audio_playing = False
 
         actual_index = valid_indices[current_index]
         media_type = media_types[actual_index]

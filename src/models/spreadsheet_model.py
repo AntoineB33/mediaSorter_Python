@@ -488,14 +488,23 @@ class SpreadsheetModel(QAbstractTableModel):
             if url_col != -1:
                 if not os.path.exists(MEDIA_ROOT):
                     os.makedirs(MEDIA_ROOT)
-                show_images(self, [
-                    os.path.join(MEDIA_ROOT, self._data[i][url_col])
-                    for i in range(len(self._data))
-                    if self._data[i][url_col] and os.path.exists(os.path.join(MEDIA_ROOT, self._data[i][url_col]))
-                ])
-    
-    # def _updateCells(self, index1, index2, roles):
-    #     if index1.row() == 0:
+                
+                # Collect valid media URLs
+                media_urls = []
+                for i in range(len(self._data)):
+                    path = self._data[i][url_col]
+                    if path and os.path.exists(os.path.join(MEDIA_ROOT, path)):
+                        full_path = os.path.join(MEDIA_ROOT, path)
+                        # Convert to QUrl-compatible string
+                        media_urls.append(QUrl.fromLocalFile(full_path).toString())
+                
+                if media_urls:
+                    self.signal.emit({
+                        "type": "show_media", 
+                        "media_list": media_urls
+                    })
+                else:
+                    print("No valid media to display")
 
     
     @Slot(int, int)

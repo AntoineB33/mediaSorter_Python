@@ -272,6 +272,15 @@ Rectangle {
             Button {
                 text: "Show"
                 onClicked: spreadsheetModel.showButton()
+                // onClicked: {
+                //     var component = Qt.createComponent("FullScreenVideo.qml")
+                //     if (component.status === Component.Ready) {
+                //         var videoPlayer = component.createObject(mainWindow, {
+                //             "videoSource": "../../../data/media/PremiumBukkake - Andrea swallows 67 huge mouthful cumshots.mp4"
+                //         })
+                //         videoPlayer.show()
+                //     }
+                // }
             }
         }
     

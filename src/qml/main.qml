@@ -35,6 +35,17 @@ Window {
                 case "selected_cell_changed":
                     floatingWindow.roleComboBox.currentIndex = data.value;
                     break;
+                case "show_media":
+                    var component = Qt.createComponent("components/MediaViewer.qml")
+                    if (component.status === Component.Ready) {
+                        var mediaViewer = component.createObject(mainWindow, {
+                            "mediaList": data.media_list
+                        })
+                        mediaViewer.show()
+                    } else {
+                        console.error("MediaViewer error:", component.errorString())
+                    }
+                    break;
                 default:
                     console.warn("Unknown signal type:", data.type);
             }
