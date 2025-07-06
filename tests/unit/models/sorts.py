@@ -42,7 +42,7 @@ def test_constraint_solver():
     table2 = [
         [""],
         ["-[1]_2-"],  # Row1 must be 1 or 2 positions before Row0
-        ["_[1]-"]
+        ["_[1]"]
     ]
     roles2 = ['dependencies']
     run_test("Test 2 - Discrete positions before", 
