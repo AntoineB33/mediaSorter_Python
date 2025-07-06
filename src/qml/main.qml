@@ -38,10 +38,10 @@ Window {
                 case "show_media":
                     var component = Qt.createComponent("components/MediaViewer.qml")
                     if (component.status === Component.Ready) {
-                        var mediaViewer = component.createObject(mainWindow, {
+                        // FIX: Create as top-level window instead of child
+                        var mediaViewer = component.createObject(null, {
                             "mediaList": data.media_list
                         })
-                        mediaViewer.show()
                     } else {
                         console.error("MediaViewer error:", component.errorString())
                     }

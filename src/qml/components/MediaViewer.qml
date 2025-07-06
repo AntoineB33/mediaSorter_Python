@@ -46,6 +46,7 @@ Window {
     VideoOutput {
         id: videoOutput
         anchors.fill: parent
+        fillMode: VideoOutput.PreserveAspectCrop
     }
     
     // Controls
@@ -149,7 +150,13 @@ Window {
         cleanupMedia()
     }
     
-    Component.onCompleted: loadMedia()
+    Component.onCompleted: {
+        // Force window to top and full-screen
+        visibility = Window.FullScreen
+        requestActivate()
+        raise()
+        loadMedia()
+    }
     Component.onDestruction: cleanupMedia() // Extra safety
     
     // Keyboard controls

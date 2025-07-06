@@ -495,6 +495,8 @@ class SpreadsheetModel(QAbstractTableModel):
                     path = self._data[i][url_col]
                     if path and os.path.exists(os.path.join(MEDIA_ROOT, path)):
                         full_path = os.path.join(MEDIA_ROOT, path)
+                        # FIX: Use native separators for Windows compatibility
+                        full_path = os.path.normpath(full_path)
                         # Convert to QUrl-compatible string
                         media_urls.append(QUrl.fromLocalFile(full_path).toString())
                 
