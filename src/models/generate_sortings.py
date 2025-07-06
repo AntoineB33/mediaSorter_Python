@@ -1,6 +1,7 @@
 from networkx import DiGraph, topological_sort, NetworkXUnfeasible, simple_cycles
 import os
 from ortools.sat.python import cp_model
+import re
 
 import re
 def reduce_redundancy(table):
@@ -79,94 +80,130 @@ class SolutionCollector(cp_model.CpSolverSolutionCallback):
 def find_valid_sortings(table, roles):
     n = len(table)
     
-    # Build dependency graph and parse optimization goals
-    graph = DiGraph()
-    graph.add_nodes_from(range(n))
-    dependencies = [[] for _ in range(n)]
-    optimization_terms = []
-    
-    for i in range(n):
-        for c, cell in enumerate(table[i]):
-            if roles[c] != 'dependencies':
-                continue
-            entries = cell.split(';')
-            for entry in entries:
-                match = re.match(r'after\s+([1-9][0-9]*)', entry)
-                if match:
-                    j = int(match.group(1)) - 1
-                    if j >= n or j < 0:
-                        return f"Invalid dependency: {entry} in row {i+1}"
-                    dependencies[i].append(j)
-                    graph.add_edge(j, i)
-                else:
-                    match = re.match(r'as far as possible from (\d+)', entry)
-                    if match:
-                        X = int(match.group(1)) - 1
-                        if X >= n or X < 0:
-                            return f"Invalid optimization term: {entry} in row {i+1}"
-                        optimization_terms.append((i, X))
-                    elif entry != "":
-                        return f"Invalid entry: {entry} in row {i+1}"
-    
-    # Check if the dependency graph is a DAG
-    try:
-        topological_order = list(topological_sort(graph))
-    except NetworkXUnfeasible:
-        # Attempt to find a cycle to report
-        try:
-            cycle = next(simple_cycles(graph))  # Get the first cycle
-            cycle_str = ' -> '.join(map(lambda x: str(x+1), cycle)) + f' -> {cycle[0]+1}'
-            return f"The dependency graph contains a cycle: {cycle_str}"
-        except StopIteration:
-            return "The dependency graph is not a DAG (unexpected error)."
-    
-    # If no optimization terms, return the topological order
-    if not optimization_terms:
-        return [topological_order]
-    
-    # Proceed with CP model to optimize the permutation
+    # Create CP model and position variables
     model = cp_model.CpModel()
     pos = [model.NewIntVar(0, n - 1, f'pos_{i}') for i in range(n)]
     model.AddAllDifferent(pos)
     
-    # Add dependency constraints
+    # Parse dependency constraints
     for i in range(n):
-        for j in dependencies[i]:
-            model.Add(pos[j] < pos[i])
+        for c, cell in enumerate(table[i]):
+            if roles[c] != 'dependencies':
+                continue
+                
+            entries = cell.split(';')
+            for entry in entries:
+                entry = entry.strip()
+                if not entry:
+                    continue
+                    
+                # Extract reference row
+                ref_match = re.search(r'\[(\d+)\]', entry)
+                if not ref_match:
+                    return f"Missing reference row in constraint: {entry} in row {i+1}"
+                ref_row = int(ref_match.group(1)) - 1  # Convert to 0-indexed
+                
+                # Validate reference row
+                if ref_row < 0 or ref_row >= n:
+                    return f"Invalid reference row {ref_row+1} in constraint: {entry} in row {i+1}"
+                if ref_row == i:
+                    return f"Constraint in row {i+1} refers to itself"
+                
+                # Split constraint into tokens
+                try:
+                    tokens = [tok for tok in entry.strip('_').split('_') if tok]
+                    ref_token = f'[{ref_match.group(1)}]'
+                    ref_idx = tokens.index(ref_token)
+                except (ValueError, IndexError):
+                    return f"Malformed constraint: {entry} in row {i+1}"
+                
+                left_tokens = tokens[:ref_idx]
+                right_tokens = tokens[ref_idx+1:]
+                
+                # Process tokens
+                condition_vars = []
+                d = model.NewIntVar(-n+1, n-1, f'd_{i}_{ref_row}')
+                model.Add(d == pos[i] - pos[ref_row])
+                
+                # Process left tokens (negative offsets)
+                for token in left_tokens:
+                    if token.endswith('-'):
+                        # Half-line constraint (d <= -X)
+                        try:
+                            x = int(token.rstrip('-'))
+                            b = model.NewBoolVar(f'left_hl_{i}_{ref_row}_{x}')
+                            model.Add(d <= -x).OnlyEnforceIf(b)
+                            condition_vars.append(b)
+                        except ValueError:
+                            return f"Invalid number in token: {token} in row {i+1}"
+                    elif '-' in token:
+                        # Range constraint (a-b -> d in [-b, -a])
+                        try:
+                            a, b = map(int, token.split('-'))
+                            low, high = min(a, b), max(a, b)
+                            b_var = model.NewBoolVar(f'left_rg_{i}_{ref_row}_{low}_{high}')
+                            model.Add(d >= -high).OnlyEnforceIf(b_var)
+                            model.Add(d <= -low).OnlyEnforceIf(b_var)
+                            condition_vars.append(b_var)
+                        except ValueError:
+                            return f"Invalid range in token: {token} in row {i+1}"
+                    else:
+                        # Discrete value (d == -X)
+                        try:
+                            x = int(token)
+                            b = model.NewBoolVar(f'left_dc_{i}_{ref_row}_{x}')
+                            model.Add(d == -x).OnlyEnforceIf(b)
+                            condition_vars.append(b)
+                        except ValueError:
+                            return f"Invalid number in token: {token} in row {i+1}"
+                
+                # Process right tokens (positive offsets)
+                for token in right_tokens:
+                    if token.endswith('-'):
+                        # Half-line constraint (d >= X)
+                        try:
+                            x = int(token.rstrip('-'))
+                            b = model.NewBoolVar(f'right_hl_{i}_{ref_row}_{x}')
+                            model.Add(d >= x).OnlyEnforceIf(b)
+                            condition_vars.append(b)
+                        except ValueError:
+                            return f"Invalid number in token: {token} in row {i+1}"
+                    elif '-' in token:
+                        # Range constraint (a-b -> d in [a, b])
+                        try:
+                            a, b = map(int, token.split('-'))
+                            low, high = min(a, b), max(a, b)
+                            b_var = model.NewBoolVar(f'right_rg_{i}_{ref_row}_{low}_{high}')
+                            model.Add(d >= low).OnlyEnforceIf(b_var)
+                            model.Add(d <= high).OnlyEnforceIf(b_var)
+                            condition_vars.append(b_var)
+                        except ValueError:
+                            return f"Invalid range in token: {token} in row {i+1}"
+                    else:
+                        # Discrete value (d == X)
+                        try:
+                            x = int(token)
+                            b = model.NewBoolVar(f'right_dc_{i}_{ref_row}_{x}')
+                            model.Add(d == x).OnlyEnforceIf(b)
+                            condition_vars.append(b)
+                        except ValueError:
+                            return f"Invalid number in token: {token} in row {i+1}"
+                
+                # At least one condition must be satisfied
+                if condition_vars:
+                    model.AddBoolOr(condition_vars)
     
-    # Create variables for absolute differences and add to the objective
-    diff_vars = []
-    for i, X in optimization_terms:
-        diff = model.NewIntVar(0, n - 1, f'diff_{i}_{X}')
-        model.AddAbsEquality(diff, pos[i] - pos[X])
-        diff_vars.append(diff)
-    
-    # Maximize the sum of all absolute differences
-    model.Maximize(sum(diff_vars))
-    
+    # Configure solver
     workers = 1
-    cpu_available = os.cpu_count()
     if n > 100:
-        workers = min(cpu_available, 4)
-    if n > 300:
-        workers = min(cpu_available, 5)
-    if n > 500:
-        workers = min(cpu_available, 6)
-    if n > 700:
-        workers = min(cpu_available, 7)
-    if n > 900:
-        workers = min(cpu_available, 8)
-    if n > 1000:
-        workers = min(cpu_available, 16)
-            
+        workers = min(os.cpu_count(), 8)
     solver = cp_model.CpSolver()
     solver.parameters.num_search_workers = workers
-    status = solver.Solve(model)
     
-    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-        # Extract the solution
+    # Solve and return first solution
+    status = solver.Solve(model)
+    if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         solution = [solver.Value(pos[i]) for i in range(n)]
         permutation = sorted(range(n), key=lambda x: solution[x])
         return [permutation]
-    else:
-        return []
+    return []
