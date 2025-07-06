@@ -41,8 +41,8 @@ def test_constraint_solver():
     # Test 2: Discrete positions before
     table2 = [
         [""],
-        ["-[1]_"],  # Row1 must be 1 or 2 positions before Row0
-        [""]
+        ["-[1]_2-"],  # Row1 must be 1 or 2 positions before Row0
+        ["_[1]-"]
     ]
     roles2 = ['dependencies']
     run_test("Test 2 - Discrete positions before", 
@@ -52,7 +52,7 @@ def test_constraint_solver():
     table3 = [
         [""],
         [""],
-        ["_2-1_[1]_3-4"]  # Row2 must be 1-2 before or 3-4 after Row1
+        ["_3_[1]_2-4_"]  # Row2 must be 1-2 before or 3-4 after Row1
     ]
     roles3 = ['dependencies']
     run_test("Test 3 - Range constraints", 
