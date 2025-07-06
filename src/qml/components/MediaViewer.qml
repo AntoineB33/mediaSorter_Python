@@ -79,38 +79,6 @@ Window {
             videoPlayer.metaData.resolution.height * scaleFactor : parent.height
     }
     
-    // Position indicator
-    Text {
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.margins: 10
-        text: `${currentIndex+1}/${mediaList.length}`
-        color: "white"
-        font.pixelSize: 20
-        z: 1
-    }
-    
-    // Video position overlay
-    Text {
-        id: positionOverlay
-        anchors.bottom: parent.bottom
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.margins: 20
-        text: videoPlayer.position > 0 ? 
-              formatTime(videoPlayer.position) + " / " + formatTime(videoPlayer.duration) : ""
-        color: "white"
-        font.pixelSize: 24
-        z: 1
-        visible: mediaType(currentMedia) === "video"
-        
-        function formatTime(ms) {
-            const seconds = Math.floor(ms / 1000)
-            const mins = Math.floor(seconds / 60)
-            const secs = seconds % 60
-            return `${mins}:${secs < 10 ? '0' : ''}${secs}`
-        }
-    }
-    
     property string currentMedia: mediaList.length > 0 ? mediaList[currentIndex] : ""
     
     function navigate(direction) {
@@ -164,7 +132,19 @@ Window {
     function stepFrames(direction) {
         if (mediaType(currentMedia) !== "video") return
         
-        const frameMs = direction * videoPlayer.frameDuration
+        // Pause video before stepping frames
+        if (videoPlayer.playbackState === MediaPlayer.PlayingState) {
+            videoPlayer.pause()
+            mediaWindow.isPlaying = false
+        }
+        
+        // Calculate frame duration dynamically
+        let frameDuration = 40 // Default to 25fps (1000/25=40ms)
+        if (videoPlayer.metaData.videoFrameRate) {
+            frameDuration = 1000 / videoPlayer.metaData.videoFrameRate
+        }
+        
+        const frameMs = direction * frameDuration
         const newPosition = Math.max(0, Math.min(
             videoPlayer.position + frameMs, 
             videoPlayer.duration
