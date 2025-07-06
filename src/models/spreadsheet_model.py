@@ -495,10 +495,13 @@ class SpreadsheetModel(QAbstractTableModel):
                     path = self._data[i][url_col]
                     if path and os.path.exists(os.path.join(MEDIA_ROOT, path)):
                         full_path = os.path.join(MEDIA_ROOT, path)
-                        # FIX: Use native separators for Windows compatibility
                         full_path = os.path.normpath(full_path)
-                        # Convert to QUrl-compatible string
-                        media_urls.append(QUrl.fromLocalFile(full_path).toString())
+                        
+                        # Check if file exists and has valid extension
+                        valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', 
+                                           '.mp4', '.mkv', '.avi', '.mov', '.flv', '.webm']
+                        if any(full_path.lower().endswith(ext) for ext in valid_extensions):
+                            media_urls.append(QUrl.fromLocalFile(full_path).toString())
                 
                 if media_urls:
                     self.signal.emit({

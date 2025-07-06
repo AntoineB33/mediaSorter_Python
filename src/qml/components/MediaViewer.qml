@@ -5,7 +5,7 @@ import QtQuick.Window
 
 Window {
     id: mediaWindow
-    flags: Qt.Window | Qt.FramelessWindowHint
+    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     visibility: Window.FullScreen
     color: "black"
     
@@ -32,21 +32,46 @@ Window {
     
     AnimatedImage {
         id: gifPlayer
-        anchors.fill: parent
+        anchors.centerIn: parent
         fillMode: Image.PreserveAspectFit
         playing: mediaWindow.isPlaying
+        
+        // Set explicit size to natural size or scaled down
+        property real scaleFactor: Math.min(1, 
+            Math.min(parent.width / implicitWidth, parent.height / implicitHeight))
+        width: implicitWidth * scaleFactor
+        height: implicitHeight * scaleFactor
     }
     
     Image {
         id: imagePlayer
-        anchors.fill: parent
+        anchors.centerIn: parent
         fillMode: Image.PreserveAspectFit
+        
+        // Set explicit size to natural size or scaled down
+        property real scaleFactor: Math.min(1, 
+            Math.min(parent.width / implicitWidth, parent.height / implicitHeight))
+        width: implicitWidth * scaleFactor
+        height: implicitHeight * scaleFactor
     }
     
     VideoOutput {
         id: videoOutput
-        anchors.fill: parent
-        fillMode: VideoOutput.PreserveAspectCrop
+        anchors.centerIn: parent
+        fillMode: VideoOutput.PreserveAspectFit
+        
+        // Set explicit size to natural size or scaled down
+        property real scaleFactor: {
+            if (!videoPlayer.metaData.resolution) return 1
+            const vidWidth = videoPlayer.metaData.resolution.width
+            const vidHeight = videoPlayer.metaData.resolution.height
+            return Math.min(1, 
+                Math.min(parent.width / vidWidth, parent.height / vidHeight))
+        }
+        width: videoPlayer.metaData.resolution ? 
+            videoPlayer.metaData.resolution.width * scaleFactor : parent.width
+        height: videoPlayer.metaData.resolution ? 
+            videoPlayer.metaData.resolution.height * scaleFactor : parent.height
     }
     
     // Controls
@@ -59,7 +84,8 @@ Window {
         Button {
             text: "◀◀"
             onClicked: mediaWindow.navigate(-1)
-            visible: mediaWindow.mediaList.length > 1
+            enabled: currentIndex > 0
+            opacity: enabled ? 1 : 0.5
         }
         
         Button {
@@ -71,7 +97,8 @@ Window {
         Button {
             text: "▶▶"
             onClicked: mediaWindow.navigate(1)
-            visible: mediaWindow.mediaList.length > 1
+            enabled: currentIndex < mediaList.length - 1
+            opacity: enabled ? 1 : 0.5
         }
         
         Button {
@@ -93,15 +120,29 @@ Window {
     property string currentMedia: mediaList.length > 0 ? mediaList[currentIndex] : ""
     
     function navigate(direction) {
-        const newIndex = (currentIndex + direction + mediaList.length) % mediaList.length
+        const newIndex = currentIndex + direction
+        
+        // Boundary checks - don't navigate beyond first/last
+        if (newIndex < 0 || newIndex >= mediaList.length) {
+            return
+        }
+        
+        // Clean up current media before changing
+        cleanupMedia()
+        
         currentIndex = newIndex
         loadMedia()
     }
     
     function togglePlay() {
         isPlaying = !isPlaying
-        if (mediaType(currentMedia) === "video") {
+        
+        const type = mediaType(currentMedia)
+        if (type === "video") {
             isPlaying ? videoPlayer.play() : videoPlayer.pause()
+        }
+        else if (type === "gif") {
+            gifPlayer.playing = isPlaying
         }
     }
     
@@ -114,22 +155,25 @@ Window {
             gifPlayer.visible = false
             imagePlayer.visible = false
             videoOutput.visible = true
+            isPlaying = true
         } 
         else if (type === "gif") {
             gifPlayer.source = currentMedia
             gifPlayer.visible = true
             imagePlayer.visible = false
             videoOutput.visible = false
+            isPlaying = true
         } 
         else if (type === "image") {
             imagePlayer.source = currentMedia
             gifPlayer.visible = false
             imagePlayer.visible = true
             videoOutput.visible = false
+            isPlaying = false
         }
     }
     
-    // ADD THIS: Clean up media resources
+    // Clean up media resources
     function cleanupMedia() {
         // Stop and reset video player
         if (videoPlayer.playbackState !== MediaPlayer.StoppedState) {
@@ -145,25 +189,25 @@ Window {
         imagePlayer.source = ""
     }
     
-    // ADD THIS: Handle window closing
+    // Handle window closing
     onClosing: {
         cleanupMedia()
     }
     
     Component.onCompleted: {
-        // Force window to top and full-screen
         visibility = Window.FullScreen
         requestActivate()
         raise()
         loadMedia()
     }
-    Component.onDestruction: cleanupMedia() // Extra safety
+    
+    Component.onDestruction: cleanupMedia()
     
     // Keyboard controls
     Shortcut {
         sequence: "Esc"
         onActivated: {
-            cleanupMedia() // Stop media before closing
+            cleanupMedia()
             mediaWindow.close()
         }
     }
