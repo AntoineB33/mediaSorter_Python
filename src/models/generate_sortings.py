@@ -84,12 +84,12 @@ def parse_constraint(entry, n):
     return (ref_row, intervals), None
 
 def find_valid_sortings(table, roles):
-    n = len(table)
+    n = len(table) - 1
     constraints = []
     
     # Parse all constraints
     for i in range(n):
-        for c, cell in enumerate(table[i]):
+        for c, cell in enumerate(table[i + 1]):
             if roles[c] != 'dependencies':
                 continue
             entries = cell.split(';')

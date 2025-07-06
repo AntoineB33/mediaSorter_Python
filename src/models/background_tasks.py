@@ -17,7 +17,7 @@ def checkings_thread(self):
             while not self.checkings_list:
                 self.condition.wait()
             task = self.checkings_list[0]
-        data = self.collections[task["collectionName"]].data[1:]
+        data = self.collections[task["collectionName"]].data
         roles = self.collections[task["collectionName"]].roles
         res = find_valid_sortings(data, roles)
         if type(res) is str:
@@ -41,7 +41,7 @@ def sortings_thread(self):
             task = self.sortings_list[0]
             collectionName = task["collectionName"]
             task_id = task["id"]
-        data = self.collections[collectionName].data[1:]
+        data = self.collections[collectionName].data
         roles = self.collections[collectionName].roles
         res = find_valid_sortings(data, roles)
         with self._data_lock:
@@ -59,9 +59,9 @@ def sortings_thread(self):
                 new_errorMsg = filter(lambda x: x[0] != collectionName, self._errorMsg)
                 if new_errorMsg != self._errorMsg:
                     self.signal.emit({"type": "FloatingWindow_text_changed", "value": "\n".join([" : ".join(e) for e in self._errorMsg])})
-                if task["reorder"] and res[0] != list(range(len(data))):
+                if task["reorder"] and res[0] != list(range(len(data) - 1)):
                     self.beginResetModel()
-                    self._data[1:] = [data[i] for i in res[0]]
+                    self._data[1:] = [data[i + 1] for i in res[0]]
                     for r in self._data[1:]:
                         for colInd, c in enumerate(r):
                             if roles[colInd] != 'dependencies':
