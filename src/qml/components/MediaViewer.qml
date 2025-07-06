@@ -128,12 +128,37 @@ Window {
         }
     }
     
+    // ADD THIS: Clean up media resources
+    function cleanupMedia() {
+        // Stop and reset video player
+        if (videoPlayer.playbackState !== MediaPlayer.StoppedState) {
+            videoPlayer.stop()
+        }
+        videoPlayer.source = ""
+        
+        // Reset GIF player
+        gifPlayer.playing = false
+        gifPlayer.source = ""
+        
+        // Reset image player
+        imagePlayer.source = ""
+    }
+    
+    // ADD THIS: Handle window closing
+    onClosing: {
+        cleanupMedia()
+    }
+    
     Component.onCompleted: loadMedia()
+    Component.onDestruction: cleanupMedia() // Extra safety
     
     // Keyboard controls
     Shortcut {
         sequence: "Esc"
-        onActivated: mediaWindow.close()
+        onActivated: {
+            cleanupMedia() // Stop media before closing
+            mediaWindow.close()
+        }
     }
     
     Shortcut {
