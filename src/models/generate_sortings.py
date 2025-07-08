@@ -13,9 +13,13 @@ def parse_constraint(entry, n):
         return None, "No reference found in constraint"
     
     try:
-        ref_row = int(ref_match.group(1)) - 1
-        if ref_row < 0 or ref_row >= n:
-            return None, f"Reference row {ref_row+1} is out of range"
+        ref_str = ref_match.group(1)
+        if ref_str == "0":
+            ref_row = -1  # Special virtual row
+        else:
+            ref_row = int(ref_str) - 1
+            if ref_row < 0 or ref_row >= n:
+                return None, f"Reference row {ref_str} is out of range"
     except ValueError:
         return None, f"Invalid reference format: {ref_match.group(1)}"
     
@@ -110,18 +114,35 @@ def find_valid_sortings(table, roles):
     
     # Add constraints
     for idx, (i, ref, intervals) in enumerate(constraints):
-        offset = positions[i] - positions[ref]
+        # Handle virtual row [0] at position -1
+        if ref == -1:  # Virtual row [0]
+            offset = positions[i] + 1  # Since virtual row is at -1
+        else:
+            offset = positions[i] - positions[ref]
+        
         bool_vars = []
         
         for j, (a, b) in enumerate(intervals):
             bool_var = model.NewBoolVar(f'c_{idx}_{j}')
-            if a is not None and b is not None:
-                model.Add(offset >= a).OnlyEnforceIf(bool_var)
-                model.Add(offset <= b).OnlyEnforceIf(bool_var)
-            elif a is None:
-                model.Add(offset <= b).OnlyEnforceIf(bool_var)
-            elif b is None:
-                model.Add(offset >= a).OnlyEnforceIf(bool_var)
+            
+            # For virtual row constraints, adjust logic
+            if ref == -1:
+                if a is not None and b is not None:
+                    model.Add(offset >= a).OnlyEnforceIf(bool_var)
+                    model.Add(offset <= b).OnlyEnforceIf(bool_var)
+                elif a is None:
+                    model.Add(offset <= b).OnlyEnforceIf(bool_var)
+                elif b is None:
+                    model.Add(offset >= a).OnlyEnforceIf(bool_var)
+            else:
+                if a is not None and b is not None:
+                    model.Add(offset >= a).OnlyEnforceIf(bool_var)
+                    model.Add(offset <= b).OnlyEnforceIf(bool_var)
+                elif a is None:
+                    model.Add(offset <= b).OnlyEnforceIf(bool_var)
+                elif b is None:
+                    model.Add(offset >= a).OnlyEnforceIf(bool_var)
+            
             bool_vars.append(bool_var)
         
         if bool_vars:
