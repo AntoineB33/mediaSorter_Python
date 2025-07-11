@@ -100,6 +100,35 @@ def load_gif_frames(image_path, screen_width, screen_height):
         logging.error(f"Error loading GIF {image_path}: {e}")
     return frames, durations
 
+def seek_video(video_cap, seconds, fps, audio_playing, audio_ready, video_paused):
+    current_time = video_cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+    new_time = max(0, current_time + seconds)
+    video_cap.set(cv2.CAP_PROP_POS_MSEC, new_time * 1000)
+    
+    if audio_playing and audio_ready:
+        try:
+            pygame.mixer.music.stop()
+            pygame.mixer.music.play(0, new_time)
+            if video_paused:
+                pygame.mixer.music.pause()
+        except Exception as e:
+            logging.error(f"Error seeking audio: {e}")
+
+def step_frame(video_cap, step, fps, audio_playing, audio_ready, video_paused):
+    current_frame = video_cap.get(cv2.CAP_PROP_POS_FRAMES)
+    new_frame = max(0, current_frame + step)
+    video_cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame)
+    
+    if audio_playing and audio_ready:
+        new_time = new_frame / fps
+        try:
+            pygame.mixer.music.stop()
+            pygame.mixer.music.play(0, new_time)
+            if video_paused:
+                pygame.mixer.music.pause()
+        except Exception as e:
+            logging.error(f"Error stepping audio: {e}")
+
 def show_images(self, image_paths):
     # Initialize Pygame
     pygame.init()
@@ -123,6 +152,7 @@ def show_images(self, image_paths):
     video_paths = []
     audio_threads = []
     audio_files = []
+    audio_ready = [False] * len(image_paths)
     
     # Get ffmpeg path
     ffmpeg_path = get_ffmpeg_path()
@@ -132,7 +162,7 @@ def show_images(self, image_paths):
         logging.warning("FFmpeg not found. Videos will play without audio.")
         print("Warning: FFmpeg not found. Videos will play without audio.")
     
-    for path in image_paths:
+    for i, path in enumerate(image_paths):
         ext = os.path.splitext(path)[1].lower()
         if ext == ".gif":
             frames, durations = load_gif_frames(path, screen_width, screen_height)
@@ -162,7 +192,7 @@ def show_images(self, image_paths):
             # Only extract audio if ffmpeg is available
             if ffmpeg_available:
                 # Start audio extraction in background thread
-                def extract_audio(video_path, audio_path, ffmpeg_path):
+                def extract_audio(video_path, audio_path, ffmpeg_path, index):
                     try:
                         logging.info(f"Starting audio extraction for {video_path}")
                         cmd = [
@@ -188,10 +218,12 @@ def show_images(self, image_paths):
                             logging.error(f"FFmpeg stderr: {result.stderr}")
                         else:
                             logging.info(f"Audio extraction successful for {video_path}")
+
+                        audio_ready[index] = True
                     except Exception as e:
                         logging.error(f"Audio extraction exception for {video_path}: {e}")
                 
-                t = threading.Thread(target=extract_audio, args=(path, audio_path, ffmpeg_path))
+                t = threading.Thread(target=extract_audio, args=(path, audio_path, ffmpeg_path, i))
                 t.daemon = True
                 t.start()
                 audio_threads.append(t)
@@ -244,6 +276,8 @@ def show_images(self, image_paths):
 
     while running:
         dt = clock.tick(60)
+        actual_index = valid_indices[current_index]
+        media_type = media_types[actual_index]
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -427,10 +461,17 @@ def show_images(self, image_paths):
                     audio_playing = False
                 
                 video_start_time = pygame.time.get_ticks()
+                
+                video_fps = video_cap.get(cv2.CAP_PROP_FPS)
+                if video_fps <= 0:
+                    video_fps = 30
             
             if not video_paused:
                 ret, frame = video_cap.read()
-                if not ret:
+                if ret:
+                    last_video_frame = surf
+                    last_video_pos = (x_pos, y_pos)
+                else:
                     # End of video, move to next
                     logging.info(f"End of video: {video_path}")
                     video_cap.release()
@@ -440,6 +481,7 @@ def show_images(self, image_paths):
                         audio_playing = False
                     current_index = min(current_index + 1, len(valid_indices) - 1)
                     continue
+                    video_cap.set(cv2.CAP_PROP_POS_FRAMES, video_cap.get(cv2.CAP_PROP_FRAME_COUNT) - 1)
                 
                 # Process and display frame
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
