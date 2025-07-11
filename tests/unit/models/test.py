@@ -1,61 +1,62 @@
-import re
-import string
-
 def process_table(table):
-    row_labels = list(string.ascii_uppercase)
+    output_lines = []
     n = len(table)
-    labels = row_labels[:n]
     
-    for i, row in enumerate(table):
-        row_label = labels[i]
-        for cell in row:
-            if not isinstance(cell, str):
-                continue
+    for i in range(n):
+        row = table[i]
+        if not row:
+            output_lines.append("")
+            continue
             
-            # Forbidden constraint pattern: "-10_6-2_[55]_4-7_"
-            forbidden_match = re.findall(r'(-?\d+)_(-?\d+)_?\[?(\d+)\]?', cell)
-            if forbidden_match:
-                ranges = []
-                target_row = None
-                parts = re.split(r'\[|\]', cell)
-                if len(parts) >= 2:
-                    target_row_idx = int(parts[1])
-                    target_label = labels[target_row_idx]
-                    ranges = re.findall(r'-?\d+_?-?\d*', parts[0] + parts[2])
-                    parsed_ranges = []
-                    for r in ranges:
-                        nums = list(map(int, r.split('_')))
-                        if len(nums) == 1:
-                            parsed_ranges.append((nums[0], nums[0]))
-                        elif len(nums) == 2:
-                            low, high = nums
-                            if r.endswith('_'):
-                                high = float('inf')
-                            parsed_ranges.append((low, high))
-                    add_forbidden_constraint(row_label, target_label, parsed_ranges)
+        current_label = row[0]
+        found = False
+        if len(row) > 1:
+            for j in range(1, len(row)):
+                content = row[j].strip()
+                if content.startswith('['):
+                    end_bracket = content.find(']')
+                    if end_bracket == -1:
+                        continue
+                    index_str = content[1:end_bracket].strip()
+                    try:
+                        index_num = int(index_str)
+                    except ValueError:
+                        continue
+                    if index_num < 1 or index_num > n:
+                        continue
+                    target_label = table[index_num-1][0]
+                    intervals_str = content[end_bracket+1:].strip()
+                    list_str = '[' + intervals_str + ']'
+                    func_call = f"add_forbidden_constraint({repr(current_label)}, {repr(target_label)}, {list_str})"
+                    output_lines.append(func_call)
+                    found = True
+                    break
+                elif "as far as possible from" in content:
+                    tokens = content.split()
+                    if not tokens:
+                        continue
+                    last_token = tokens[-1]
+                    try:
+                        index_num = int(last_token)
+                    except ValueError:
+                        continue
+                    if index_num < 1 or index_num > n:
+                        continue
+                    target_label = table[index_num-1][0]
+                    func_call = f"add_maximize_distance_constraint({repr(current_label)}, {repr(target_label)})"
+                    output_lines.append(func_call)
+                    found = True
+                    break
+        if not found:
+            output_lines.append("")
+    return output_lines
 
-            # Distance maximization pattern: "as far as possible from 78"
-            dist_match = re.search(r'as far as possible from (\d+)', cell, re.IGNORECASE)
-            if dist_match:
-                target_row_idx = int(dist_match.group(1))
-                target_label = labels[target_row_idx]
-                add_maximize_distance_constraint(row_label, target_label)
-
-    return labels
-
-
-def add_forbidden_constraint(from_label, to_label, ranges):
-    print(f"Forbidden: {from_label} <-> {to_label} with ranges {ranges}")
-
-def add_maximize_distance_constraint(from_label, to_label):
-    print(f"Maximize distance: {from_label} <-> {to_label}")
-
-
-table = [
-    ["_[1]_1-8_", "as far as possible from 1"],
-    ["nothing here", "irrelevant"],
-    ["nothing here", "irrelevant"]
-]
-
-labels = process_table(table)
-print(labels)
+print(process_table([
+    ["[3] (-10, -6), (-2, 4), (7, float('inf'))", "[2] (-3, 2)"],
+    ["[2] (-3, 2)"],
+    ["as far as possible from 1"],
+    ["as far as possible from 2"],
+    [""],
+    ["[3] (-5, 0)"],
+    ["as far as possible from 4"]
+]))
