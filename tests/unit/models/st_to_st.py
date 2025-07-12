@@ -75,3 +75,6 @@ print(get_intervals("_6-2_[55]_4-7_9-"))
 
 print(get_intervals("_[140]-1_8-9_"))
 # → "[140] (-float('inf'), 0), (2, 7), (10, float('inf'))"
+
+print(get_intervals("_[140]-"))
+# → "[140] (-float('inf'), float('inf'))"
