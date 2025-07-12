@@ -12,67 +12,76 @@ from typing import List, Tuple
 def get_intervals(s: str) -> str:
     # 1) Split on '_' and drop empties
     parts = [p for p in s.split('_') if p]
+
     # 2) Find the bracketed center and its index
-    center_idx = next(i for i,p in enumerate(parts) if '[' in p and ']' in p)
-    # 3) Extract the bracket value and any trailing "-N"
-    m = re.match(r'\[(\-?\d+)\](?:-(\d+))?$', parts[center_idx])
-    center_val = int(m[1])
+    center_idx = next(i for i, p in enumerate(parts) if '[' in p and ']' in p)
+
+    # 3) Extract the bracket value and any trailing "-N" or "-" 
+    m = re.match(r'\[(\-?\d+)\](?:-(\d*))?$', parts[center_idx])
+    if not m:
+        raise ValueError(f"cannot parse center segment {parts[center_idx]!r}")
+    center_val = int(m.group(1))
+
     # 4) Collect exclusion intervals (inclusive) as integer offsets from center
-    excl: List[Tuple[int, int]] = []
-    # 4a) If the bracket part has a "-N" suffix, treat that as [0..N]
-    if m[2] is not None:
-        b = int(m[2])
-        excl.append((0, b))
+    excl: List[Tuple[float, float]] = []
+
+    # 4a) If the bracket part has a "-N" or "-" suffix, treat that as (1..N] or (1..∞)
+    if m.group(2) is not None:
+        if m.group(2) == '':
+            b = inf
+        else:
+            b = int(m.group(2))
+        # exclude offsets 1 through b
+        excl.append((1, b))
+
     # 4b) Now handle every other segment
     for i, seg in enumerate(parts):
         if i == center_idx:
             continue
-        # parse A-B (either A or B may be missing)
         ma = re.match(r'^(\d*)-(\d*)$', seg)
         if not ma:
             raise ValueError(f"cannot parse segment {seg!r}")
         a_str, b_str = ma.groups()
-        # convert to ints or infinities
-        if a_str == '':
-            a = -inf
-        else:
-            a = int(a_str)
-        if b_str == '':
-            b = inf
-        else:
-            b = int(b_str)
-        # now turn into offsets: if segment is before center, negate both
+        a = -inf if a_str == '' else int(a_str)
+        b = inf if b_str == '' else int(b_str)
+        # convert to offsets relative to center
         if i < center_idx:
             a, b = -b, -a
-        # ensure proper ordering
         start, end = min(a, b), max(a, b)
         excl.append((start, end))
+
     # 5) Merge & sort exclusions
     excl.sort()
-    merged: List[Tuple[int,int]] = []
+    merged: List[Tuple[float, float]] = []
     for st, en in excl:
         if not merged or st > merged[-1][1] + 1:
             merged.append((st, en))
         else:
-            # overlap or contiguous: extend
             merged[-1] = (merged[-1][0], max(merged[-1][1], en))
-    # 6) Compute the complementary (allowed) intervals
-    allowed: List[Tuple[float,float]] = []
+
+    # 6) Compute complementary (allowed) intervals
+    allowed: List[Tuple[float, float]] = []
     prev_end = -inf
     for st, en in merged:
+        # gap before this exclusion
         if prev_end <= st - 1:
             allowed.append((prev_end, st - 1))
         prev_end = en + 1
     # final tail
     allowed.append((prev_end, inf))
-    # 7) Format as a string
+
+    # 7) Drop any degenerate (inf, inf) tail
+    allowed = [(a, b) for a, b in allowed if not (a == inf and b == inf)]
+
+    # 8) Format
     def fmt(x):
         if x == inf:
             return "float('inf')"
         if x == -inf:
             return "-float('inf')"
         return str(int(x))
-    intervals_str = ", ".join(f"({fmt(a)}, {fmt(b)})" for a,b in allowed)
+
+    intervals_str = ", ".join(f"({fmt(a)}, {fmt(b)})" for a, b in allowed)
     return f"[{center_val}] {intervals_str}"
 
 def generate_unique_strings(n):
@@ -315,7 +324,12 @@ def sorter(table, roles):
             if roles[j] == 'dependencies':
                 cell_list = cell.split(';')
                 for instr in cell_list:
-                    instr_table[i].append(get_intervals(instr.strip().lower()))
+                    instr = instr.strip().lower()
+                    if instr and not re.match(r'^as far as possible from \d+$', instr):
+                        try:
+                            instr_table[i].append(get_intervals(instr))
+                        except ValueError as e:
+                            print(f"Error parsing instruction '{instr}' in row {i}, column {j}: {e}")
     alph = generate_unique_strings(len(roles))
     sorter = ConstraintSorter(alph)
     go(alph, instr_table, sorter)

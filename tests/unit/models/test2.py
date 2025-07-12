@@ -58,7 +58,7 @@ def go(strings, instructions):
 test_strings = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
 test_instructions = [
     ["[3] (-10, -6), (-2, 4), (7, float('inf'))", "[2] (-3, 2)"],
-    ["[2] (-3, 2)"],
+    ["[2] (-float('inf'), 2)"],
     ["as far as possible from 1"],
     ["as far as possible from 2"],
     [""],
