@@ -96,14 +96,55 @@ def generate_unique_strings(n):
                 return result
         length += 1
 
-def go(strings, instructions, sorter):
-    """
-    Parses a list of instruction strings and applies appropriate constraint functions.
 
-    Parameters:
-    - strings: List[str], list of variable names.
-    - instructions: List[List[str]], list of instruction lists corresponding to each string.
+def parse_intervals(intervals_part: str):
     """
+    Given a string like "(-10, -6), (-2, 4), (7, float('inf')), (-float('inf'), 2)",
+    returns a list of (lo, hi) tuples, with ±math.inf if 'inf' is present.
+    """
+    def to_num(s: str) -> float:
+        s = s.strip()
+        if 'inf' in s:
+            return -math.inf if s.startswith('-') else math.inf
+        return float(s)
+
+    intervals = []
+    i = 0
+    n = len(intervals_part)
+    while i < n:
+        if intervals_part[i] == '(':
+            depth = 1
+            start = i + 1
+            i += 1
+            while i < n and depth > 0:
+                if intervals_part[i] == '(':
+                    depth += 1
+                elif intervals_part[i] == ')':
+                    depth -= 1
+                i += 1
+            chunk = intervals_part[start:i-1].strip()
+
+            # Split on the top‑level comma
+            depth2 = 0
+            for j, c in enumerate(chunk):
+                if c == '(':
+                    depth2 += 1
+                elif c == ')':
+                    depth2 -= 1
+                elif c == ',' and depth2 == 0:
+                    lo_str, hi_str = chunk[:j], chunk[j+1:]
+                    break
+            else:
+                raise ValueError(f"Malformed interval (no top-level comma): {chunk!r}")
+
+            lo = to_num(lo_str)
+            hi = to_num(hi_str)
+            intervals.append((lo, hi))
+        else:
+            i += 1
+    return intervals
+
+def go(strings, instructions, sorter):
     for idx, inst_list in enumerate(instructions):
         current = strings[idx]
         for inst in inst_list:
@@ -111,26 +152,16 @@ def go(strings, instructions, sorter):
             if not inst:
                 continue
 
-            # Forbidden constraint: [n] (a, b), ...
+            # Forbidden constraint
             m = re.match(r"^\[(\d+)\]\s*(.*)$", inst)
             if m:
-                # Extract target index and interval string
                 tgt_idx = int(m.group(1)) - 1
                 target = strings[tgt_idx]
-                intervals_part = m.group(2)
-
-                # Parse intervals
-                intervals = []
-                for part in re.findall(r"\(([^)]+)\)", intervals_part):
-                    lo_str, hi_str = map(str.strip, part.split(','))
-                    lo = float(lo_str)
-                    hi = math.inf if 'inf' in hi_str else float(hi_str)
-                    intervals.append((lo, hi))
-
+                intervals = parse_intervals(m.group(2))
                 sorter.add_forbidden_constraint(current, target, intervals)
                 continue
 
-            # Maximize distance constraint: as far as possible from n
+            # Maximize distance
             m2 = re.match(r"^as far as possible from\s+(\d+)$", inst)
             if m2:
                 tgt_idx = int(m2.group(1)) - 1
@@ -138,9 +169,8 @@ def go(strings, instructions, sorter):
                 sorter.add_maximize_distance_constraint(current, target)
                 continue
 
-            # Unrecognized instruction
             raise ValueError(f"Unrecognized instruction: {inst}")
-        
+
 class ConstraintSorter:
     def __init__(self, elements: List[str]):
         self.elements = elements
@@ -300,17 +330,20 @@ class ConstraintSorter:
         return best_arrangement
 
 
-def order_table(res, table):
-    old_to_new = {old_index: new_index for new_index, old_index in enumerate(res)}
+def order_table(res, table, roles):
+    res.insert(0, -1)
+    old_to_new = {old_index+1: new_index+1 for new_index, old_index in enumerate(res)}
     new_table = []
     for old_index in res:
-        original_row = table[old_index]
+        original_row = table[old_index+1]
         new_row = []
-        for cell in original_row:
-            if isinstance(cell, str):
-                updated_cell = re.sub(r'\[(\d+)\]', lambda m: '[' + str(old_to_new[int(m.group(1))]) + ']', cell)
-                updated_cell = re.sub(r'as far as possible from (\d+)', lambda m: "as far as possible from " + str(old_to_new[int(m.group(1))]), updated_cell)
-                new_row.append(updated_cell)
+        for j, cell in enumerate(original_row):
+            if roles[j] == 'dependencies':
+                if isinstance(cell, str):
+                    updated_cell = re.sub(r'\d+', lambda m: str(old_to_new[int(m.group(0))]), cell)
+                    new_row.append(updated_cell)
+                else:
+                    new_row.append(cell)
             else:
                 new_row.append(cell)
         new_table.append(new_row)
@@ -318,19 +351,28 @@ def order_table(res, table):
 
 def sorter(table, roles):
     instr_table = []
-    for i, row in enumerate(table):
+    dep_pattern = [cell.split('.') for cell in table[0]]
+    for i, row in enumerate(table[1:]):
         instr_table.append([])
         for j, cell in enumerate(row):
             if roles[j] == 'dependencies':
                 cell_list = cell.split(';')
                 for instr in cell_list:
-                    instr = instr.strip().lower()
-                    if instr and not re.match(r'^as far as possible from \d+$', instr):
-                        try:
-                            instr_table[i].append(get_intervals(instr))
-                        except ValueError as e:
-                            print(f"Error parsing instruction '{instr}' in row {i}, column {j}: {e}")
-    alph = generate_unique_strings(len(roles))
+                    if instr:
+                        instr_split = instr.split('.')
+                        if len(instr_split) != len(dep_pattern[j])-1:
+                            print(f"Error in row {i+1}, column {j+1}: {instr!r} does not match dependencies pattern {dep_pattern[j]!r}")
+                            return f"Error in row {i+1}, column {j+1}: {instr!r} does not match dependencies pattern {dep_pattern[j]!r}"
+                        if dep_pattern[j]:
+                            instr = dep_pattern[j][0] + ''.join([instr_split[i]+dep_pattern[j][i+1] for i in range(len(instr_split))])
+                        if re.match(r'^as far as possible from \d+$', instr):
+                            instr_table[i].append(instr)
+                        else:
+                            try:
+                                instr_table[i].append(get_intervals(instr))
+                            except ValueError as e:
+                                print(f"Error parsing instruction '{instr}' in row {i}, column {j}: {e}")
+    alph = generate_unique_strings(len(table)-1)
     sorter = ConstraintSorter(alph)
     go(alph, instr_table, sorter)
     
@@ -338,14 +380,31 @@ def sorter(table, roles):
     print("Solving constraint-based sorting problem...")
     solution = sorter.solve(max_attempts=50, max_iterations=2000)
     
-    if solution:
-        print(f"Solution found: {solution}")
-        print(f"Is valid: {sorter.is_valid_placement(solution)}")
-        print(f"Distance score: {sorter.calculate_distance_score(solution)}")
-        
-        # Show positions for clarity
-        print("\nPositions:")
-        for i, elem in enumerate(solution):
-            print(f"Position {i}: {elem}")
-    else:
+    if not solution:
         print("No valid solution found!")
+        return "No valid solution found!"
+    if type(solution) is string:
+        return solution
+    print(f"Solution found: {solution}")
+    print(f"Is valid: {sorter.is_valid_placement(solution)}")
+    print(f"Distance score: {sorter.calculate_distance_score(solution)}")
+    
+    # Show positions for clarity
+    print("\nPositions:")
+    for i, elem in enumerate(solution):
+        print(f"Position {i}: {elem}")
+    
+    res = [alph.index(elem) for elem in solution]
+    new_table = order_table(res, table)
+    new_table.insert(0, table[0])  # Add header back
+    return new_table
+
+if __name__ == "__main__":
+    #take from clipboard
+    import pyperclip
+    clipboard_content = pyperclip.paste()
+    table = [line.split('\t') for line in clipboard_content.split('\n')]
+    roles = table[0]
+    result = sorter(table[1:], roles)
+    new_clipboard_content = '\n'.join(['\t'.join(row) for row in result])
+    pyperclip.copy(new_clipboard_content)
