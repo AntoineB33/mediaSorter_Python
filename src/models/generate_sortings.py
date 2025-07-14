@@ -401,6 +401,19 @@ def order_table(res, table, roles):
 def sorter(table, roles):
     instr_table = []
     dep_pattern = [cell.split('.') for cell in table[0]]
+    attributes = {}
+    for i, row in enumerate(table[1:]):
+        for j, cell in enumerate(row):
+            if roles[j] == 'attributes':
+                cell_list = cell.split(';')
+                for cat in cell_list:
+                    if cat not in attributes:
+                        attributes[cat] = []
+                    if i not in attributes[cat]:
+                        attributes[cat].append(i+1)
+                    else:
+                        print(f"Error in row {i+1}, column {j+1}: category {cat!r} already exists for this row")
+                        return f"Error in row {i+1}, column {j+1}: category {cat!r} already exists for this row"
     for i, row in enumerate(table[1:]):
         instr_table.append([])
         for j, cell in enumerate(row):
@@ -414,13 +427,66 @@ def sorter(table, roles):
                             return f"Error in row {i+1}, column {j+1}: {instr!r} does not match dependencies pattern {dep_pattern[j]!r}"
                         if dep_pattern[j]:
                             instr = dep_pattern[j][0] + ''.join([instr_split[i]+dep_pattern[j][i+1] for i in range(len(instr_split))])
-                        if re.match(r'^as far as possible from \d+$', instr):
-                            instr_table[i].append(instr)
+                        match = re.match(r'^as far as possible from (\((\d+)\)|(\d+))$', instr)
+                        if match:
+                            if match.group(2):
+                                number = int(match.group(2))
+                                for r in attributes.get(number, []):
+                                    instr_table[i].append(f"as far as possible from {r}")
+                            else:
+                                instr_table[i].append(instr)
                         else:
                             try:
-                                instr_table[i].append(get_intervals(instr))
+                                instr = get_intervals(instr)
+                                # Pattern to match strings like "[(55)] ..." and capture the number and rest
+                                pattern = r'\[\((\d+)\)\](.*)'
+
+                                match = re.match(pattern, instr)
+                                if match:
+                                    rest_of_string = match.group(2)
+                                    for r in attributes.get(number, []):
+                                        instr_table[i].append(f"[{r}]{rest_of_string}")
+                                else:
+                                    instr_table[i].append(instr)
                             except ValueError as e:
                                 print(f"Error parsing instruction '{instr}' in row {i}, column {j}: {e}")
+    not_finished = len(table[1:])
+    finished = [False for _ in range(not_finished)]
+    while not_finished:
+        for i, row in table[1:]:
+            if finished[i]:
+                continue
+            has_unresolved = False
+            for j, cell in enumerate(row):
+                if roles[j] == 'pointers':
+                    instr = cell.split(';')
+                    for instr_item in instr:
+                        try:
+                            if not finished[int(instr_item)-1]:
+                                has_unresolved = True
+                                break
+                        except ValueError:
+                            print(f"Error in row {i+1}, column {j+1}: invalid pointer {instr_item!r}")
+                            return f"Error in row {i+1}, column {j+1}: invalid pointer {instr_item!r}"
+                    if has_unresolved:
+                        break
+            if not has_unresolved:
+                for j, cell in enumerate(row):
+                    if roles[j] == 'pointers':
+                        instr = cell.split(';')
+                        for pointed_row in instr:
+                            instr_table[i] += instr_table[int(pointed_row)-1]
+                            path = table[int(pointed_row)][roles.index('path')]
+                            if path:
+                                if row[roles.index('path')]:
+                                    print(f"Warning: row {i+1} has a path {row[roles.index('path')]} but also points to row {int(pointed_row)} with path {path}.")
+                                    return f"Warning: row {i+1} has a path {row[roles.index('path')]} but also points to row {int(pointed_row)} with path {path}."
+                                row[roles.index('path')] = path
+                finished[i] = True
+                not_finished -= 1
+    new_indexes = []
+    for i, row in enumerate(table[1:]):
+        
     alph = generate_unique_strings(len(table)-1)
     sorter = ConstraintSorter(alph)
     go(alph, instr_table, sorter)
