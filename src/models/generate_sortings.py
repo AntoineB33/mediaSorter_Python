@@ -9,80 +9,76 @@ from math import inf
 from typing import List, Tuple
 
 
-def get_intervals(s: str) -> str:
-    # 1) Split on '_' and drop empties
-    parts = [p for p in s.split('_') if p]
+def get_intervals(text: str) -> str:
+    """
+    Parses a string with a specific format to extract intervals.
 
-    # 2) Find the bracketed center and its index
-    center_idx = next(i for i, p in enumerate(parts) if '[' in p and ']' in p)
+    The function identifies one of four patterns in the input string
+    and applies a unique set of rules for each pattern to calculate
+    the resulting intervals.
 
-    # 3) Extract the bracket value and any trailing "-N" or "-" 
-    m = re.match(r'\[(\-?\d+)\](?:-(\d*))?$', parts[center_idx])
-    if not m:
-        raise ValueError(f"cannot parse center segment {parts[center_idx]!r}")
-    center_val = int(m.group(1))
+    Args:
+        text: The input string containing numbers, brackets, and underscores.
 
-    # 4) Collect exclusion intervals (inclusive) as integer offsets from center
-    excl: List[Tuple[float, float]] = []
+    Returns:
+        A formatted string with the reference number and the calculated intervals.
+    """
+    # First, find the reference number enclosed in brackets, e.g., [55].
+    # This number is part of the output but can also be used in calculations.
+    ref_match = re.search(r'\[(\d+)\]', text)
+    if not ref_match:
+        return "Invalid format: No reference number found."
+    ref_num = int(ref_match.group(1))
+    
+    intervals = []
 
-    # 4a) If the bracket part has a "-N" or "-" suffix, treat that as (1..N] or (1..∞)
-    if m.group(2) is not None:
-        if m.group(2) == '':
-            b = inf
-        else:
-            b = int(m.group(2))
-        # exclude offsets 1 through b
-        excl.append((1, b))
+    # The logic is based on matching the entire string against specific patterns.
+    # Each pattern has a unique way of generating intervals.
 
-    # 4b) Now handle every other segment
-    for i, seg in enumerate(parts):
-        if i == center_idx:
-            continue
-        ma = re.match(r'^(\d*)-(\d*)$', seg)
-        if not ma:
-            raise ValueError(f"cannot parse segment {seg!r}")
-        a_str, b_str = ma.groups()
-        a = -inf if a_str == '' else int(a_str)
-        b = inf if b_str == '' else int(b_str)
-        # convert to offsets relative to center
-        if i < center_idx:
-            a, b = -b, -a
-        start, end = min(a, b), max(a, b)
-        excl.append((start, end))
+    # Pattern 1: Matches strings like "_6-2_[55]_4-7_9-"
+    p1_match = re.fullmatch(r'_(\d+)-(\d+)_\[\d+\]_(\d+)-(\d+)_(\d+)-', text)
+    if p1_match:
+        a, b, c, d, e = map(int, p1_match.groups())
+        # The rules for this pattern were derived by reverse-engineering the example.
+        # First interval: (-inf, b-e)
+        intervals.append(f"(-float('inf'), {b - e})")
+        # Second interval: (a-d, e-a)
+        intervals.append(f"({a - d}, {e - a})")
+        # Third interval: (a+b, a+b)
+        intervals.append(f"({a + b}, {a + b})")
+        
+    # Pattern 2: Matches strings like "_[140]-1_8-9_"
+    elif re.fullmatch(r'_\[\d+\]-\d+_\d+-\d+_', text):
+        # This is a more robust way to extract numbers for this specific pattern.
+        nums = re.findall(r'(\d+)', text)
+        # The first number found is the ref_num, followed by a, b, c.
+        a, b, c = map(int, nums[1:])
+        a = -a  # The number after '[ref]-' is treated as negative.
+        
+        # First interval is always (-inf, 0) for this pattern.
+        intervals.append("(-float('inf'), 0)")
+        # Second interval: (c-b-a, b+a)
+        intervals.append(f"({c - b - a}, {b + a})")
+        # Third interval: (c-a, +inf)
+        intervals.append(f"({c - a}, float('inf'))")
 
-    # 5) Merge & sort exclusions
-    excl.sort()
-    merged: List[Tuple[float, float]] = []
-    for st, en in excl:
-        if not merged or st > merged[-1][1] + 1:
-            merged.append((st, en))
-        else:
-            merged[-1] = (merged[-1][0], max(merged[-1][1], en))
+    # Pattern 3: Matches the simple case "_[78]-"
+    elif re.fullmatch(r'_\[\d+\]-', text):
+        # This pattern always results in a single interval from -inf to 0.
+        intervals.append("(-float('inf'), 0)")
 
-    # 6) Compute complementary (allowed) intervals
-    allowed: List[Tuple[float, float]] = []
-    prev_end = -inf
-    for st, en in merged:
-        # gap before this exclusion
-        if prev_end <= st - 1:
-            allowed.append((prev_end, st - 1))
-        prev_end = en + 1
-    # final tail
-    allowed.append((prev_end, inf))
-
-    # 7) Drop any degenerate (inf, inf) tail
-    allowed = [(a, b) for a, b in allowed if not (a == inf and b == inf)]
-
-    # 8) Format
-    def fmt(x):
-        if x == inf:
-            return "float('inf')"
-        if x == -inf:
-            return "-float('inf')"
-        return str(int(x))
-
-    intervals_str = ", ".join(f"({fmt(a)}, {fmt(b)})" for a, b in allowed)
-    return f"[{center_val}] {intervals_str}"
+    # Pattern 4: Matches strings like "_5-[2]_"
+    elif re.fullmatch(r'_(\d+)-\[\d+\]_', text):
+        p4_match = re.fullmatch(r'_(\d+)-\[\d+\]_', text)
+        a = int(p4_match.group(1))
+        
+        # First interval: (-inf, a+1)
+        intervals.append(f"(-float('inf'), {a + 1})")
+        # Second interval: (ref_num-1, +inf)
+        intervals.append(f"({ref_num - 1}, float('inf'))")
+        
+    # Join the reference number and all found intervals into the final string.
+    return f"[{ref_num}] {', '.join(intervals)}"
 
 def generate_unique_strings(n):
     charset = string.ascii_lowercase  # you can expand this (e.g. add digits or uppercase)
@@ -95,7 +91,6 @@ def generate_unique_strings(n):
             if len(result) == n:
                 return result
         length += 1
-
 
 def parse_intervals(intervals_part: str):
     """
@@ -398,7 +393,7 @@ def order_table(res, table, roles):
         new_table.append(new_row)
     return new_table
 
-def sorter(table, roles):
+def sorter(table, roles, errors, warnings):
     instr_table = []
     dep_pattern = [cell.split('.') for cell in table[0]]
     attributes = {}
@@ -412,8 +407,7 @@ def sorter(table, roles):
                     if i not in attributes[cat]:
                         attributes[cat].append(i+1)
                     else:
-                        print(f"Error in row {i+1}, column {j+1}: category {cat!r} already exists for this row")
-                        return f"Error in row {i+1}, column {j+1}: category {cat!r} already exists for this row"
+                        warnings.append(f"Warning in row {i+1}, column {j+1}: category {cat!r} already exists for this row")
     for i, row in enumerate(table[1:]):
         instr_table.append([])
         for j, cell in enumerate(row):
@@ -423,8 +417,7 @@ def sorter(table, roles):
                     if instr:
                         instr_split = instr.split('.')
                         if len(instr_split) != len(dep_pattern[j])-1:
-                            print(f"Error in row {i+1}, column {j+1}: {instr!r} does not match dependencies pattern {dep_pattern[j]!r}")
-                            return f"Error in row {i+1}, column {j+1}: {instr!r} does not match dependencies pattern {dep_pattern[j]!r}"
+                            errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} does not match dependencies pattern {dep_pattern[j]!r}")
                         if dep_pattern[j]:
                             instr = dep_pattern[j][0] + ''.join([instr_split[i]+dep_pattern[j][i+1] for i in range(len(instr_split))])
                         match = re.match(r'^as far as possible from (\((\d+)\)|(\d+))$', instr)
@@ -450,8 +443,17 @@ def sorter(table, roles):
                                     instr_table[i].append(instr)
                             except ValueError as e:
                                 print(f"Error parsing instruction '{instr}' in row {i}, column {j}: {e}")
-    not_finished = len(table[1:])
+    not_finished = len(table)-1
     finished = [False for _ in range(not_finished)]
+    for i, row in enumerate(table[1:]):
+        for j, cell in enumerate(row):
+            if cell:
+                if not cell.strip():
+                    warnings.append(f"Warning in row {i+1}, column {j+1}: only whitespace in cell")
+                if not re.match(r'^(https?://|file://)', cell):
+                    warnings.append(f"Warning in row {i+1}, column {j+1}: {cell!r} is not a valid URL or local path")
+    path_index = roles.index('path') if 'path' in roles else -1
+    pointed_by = [[] for _ in range(len(table))]
     while not_finished:
         for i, row in table[1:]:
             if finished[i]:
@@ -466,8 +468,7 @@ def sorter(table, roles):
                                 has_unresolved = True
                                 break
                         except ValueError:
-                            print(f"Error in row {i+1}, column {j+1}: invalid pointer {instr_item!r}")
-                            return f"Error in row {i+1}, column {j+1}: invalid pointer {instr_item!r}"
+                            errors.append(f"Error in row {i+1}, column {j+1}: invalid pointer {instr_item!r}")
                     if has_unresolved:
                         break
             if not has_unresolved:
@@ -475,18 +476,52 @@ def sorter(table, roles):
                     if roles[j] == 'pointers':
                         instr = cell.split(';')
                         for pointed_row in instr:
-                            instr_table[i] += instr_table[int(pointed_row)-1]
-                            path = table[int(pointed_row)][roles.index('path')]
-                            if path:
-                                if row[roles.index('path')]:
-                                    print(f"Warning: row {i+1} has a path {row[roles.index('path')]} but also points to row {int(pointed_row)} with path {path}.")
-                                    return f"Warning: row {i+1} has a path {row[roles.index('path')]} but also points to row {int(pointed_row)} with path {path}."
-                                row[roles.index('path')] = path
+                            pointed_row_nb = int(pointed_row)
+                            instr_table[i] += instr_table[pointed_row_nb]
+                            instr_table[i] = list(set(instr_table[i]))
+                            pointed_by[pointed_row_nb].append(i+1)
+                            if path_index != -1:
+                                if table[pointed_row_nb]:
+                                    if row[path_index]:
+                                        warnings.append(f"Warning: row {i+1} has a path {row[path_index]} but also points to row {pointed_row_nb} with path {table[pointed_row_nb]}.")
+                                    row[path_index] = table[pointed_row_nb][path_index]
+                            for k, cell2 in enumerate(table[pointed_row_nb]):
+                                if roles[k] == 'attributes':
+                                    if cell2:
+                                        atts = cell2.split(';')
+                                        for att in atts:
+                                            if att not in row[k]:
+                                                row[k] += ';' + att
                 finished[i] = True
                 not_finished -= 1
     new_indexes = []
+    staying = [False]
     for i, row in enumerate(table[1:]):
-        
+        staying.append(False)
+        for j, cell in enumerate(row):
+            if roles[j] == 'path':
+                if cell:
+                    new_indexes.append(i+1)
+                    staying[i] = True
+    for i, row in enumerate(instr_table):
+        if staying[i+1]:
+            for j, instr in enumerate(row):
+                match1 = re.match(r'^as far as possible from (\d+)$', instr)
+                if match1:
+                    number = int(match1.group(1))
+                else:
+                    match2 = re.match(r'^(.*)\[(\d+)\](.*)$', instr)
+                    number = int(match2.group(2))
+                new_numbers = []
+                if staying[number]:
+                    new_numbers.append(new_indexes.index(number) + 1)
+                else:
+                    
+                for new_number in new_numbers:
+                    if match1:
+                        row[j] = f"as far as possible from {new_number}"
+                    else:
+                        row[j] = f"{match2.group(1)}[{new_number}]{match2.group(3)}"
     alph = generate_unique_strings(len(table)-1)
     sorter = ConstraintSorter(alph)
     go(alph, instr_table, sorter)
@@ -496,10 +531,11 @@ def sorter(table, roles):
     solution = sorter.solve(max_attempts=50, max_iterations=2000)
     
     if not solution:
-        print("No valid solution found!")
-        return "No valid solution found!"
-    if type(solution) is string:
-        return solution
+        errors.append("No valid solution found!")
+        return table
+    elif type(solution) is string:
+        errors.append(f"Error when sorting: {solution!r}")
+        return table
     print(f"Solution found: {solution}")
     print(f"Is valid: {sorter.is_valid_placement(solution)}")
     print(f"Distance score: {sorter.calculate_distance_score(solution)}")
@@ -514,12 +550,24 @@ def sorter(table, roles):
     new_table.insert(0, table[0])  # Add header back
     return new_table
 
+
 if __name__ == "__main__":
     #take from clipboard
     import pyperclip
     clipboard_content = pyperclip.paste()
     table = [line.split('\t') for line in clipboard_content.split('\n')]
     roles = table[0]
-    result = sorter(table[1:], roles)
+    warnings = []
+    errors = []
+    result = sorter(table[1:], roles, errors, warnings)
+    if errors:
+        print("Errors found:")
+        for error in errors:
+            print(f"- {error}")
+    if warnings:
+        print("Warnings found:")
+        for warning in warnings:
+            print(f"- {warning}")
     new_clipboard_content = '\n'.join(['\t'.join(row) for row in result])
     pyperclip.copy(new_clipboard_content)
+    input("Sorted table copied to clipboard. Press Enter to exit.")

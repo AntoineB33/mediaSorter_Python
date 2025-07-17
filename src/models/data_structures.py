@@ -4,6 +4,7 @@ class RoleTypes:
     NAMES = "names"
     DEPENDENCIES = "dependencies"
     ATTRIBUTES = "attributes"
+    POINTERS = "pointers"
     PATH = "path"
 
 class collectionElement:
