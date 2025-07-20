@@ -9,7 +9,7 @@ from math import inf
 from typing import List, Tuple
 
 
-def get_intervals(text: str) -> str:
+def get_intervals(text: str, errors: List[Tuple[int, int]]) -> str:
     """
     Parses a string with a specific format to extract intervals.
 
