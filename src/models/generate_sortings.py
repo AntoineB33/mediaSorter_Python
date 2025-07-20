@@ -394,137 +394,172 @@ def order_table(res, table, roles):
     return new_table
 
 def sorter(table, roles, errors, warnings):
-    instr_table = []
-    dep_pattern = [cell.split('.') for cell in table[0]]
-    attributes = {}
+    path_index = roles.index('path') if 'path' in roles else -1
+    if path_index != -1:
+        for i, row in enumerate(table[1:]):
+            cell = row[path_index]
+            if cell:
+                if not cell.strip():
+                    warnings.append(f"Warning in row {i+1}, column {path_index+1}: only whitespace in cell")
+                if not re.match(r'^(https?://|file://)', cell):
+                    warnings.append(f"Warning in row {i+1}, column {path_index+1}: {cell!r} is not a valid URL or local path")
+    pointed_by = [[] for _ in range(len(table))]
+    point_to = [[] for _ in range(len(table))]
     for i, row in enumerate(table[1:]):
         for j, cell in enumerate(row):
-            if roles[j] == 'attributes':
+            if roles[j] == 'pointers':
+                if cell:
+                    cell_list = cell.split(';')
+                    for instr in cell_list:
+                        try:
+                            k = int(instr)
+                            if k < 1 or k > len(table)-1:
+                                errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} points to an invalid row {k}")
+                                return table
+                            else:
+                                pointed_by[k].append(i+1)
+                                point_to[i+1].append(k)
+                        except ValueError:
+                            errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} is not a valid pointer")
+                            return table
+    # find a cycle
+    def dfs(node, visited, stack):
+        visited.add(node)
+        stack.add(node)
+        for neighbor in point_to[node]:
+            if neighbor not in visited:
+                if dfs(neighbor, visited, stack):
+                    return True
+            elif neighbor in stack:
+                return True
+        stack.remove(node)
+        return False
+    visited = set()
+    stack = set()
+    for i in range(1, len(table)):
+        if i not in visited:
+            if dfs(i, visited, stack):
+                print(f"Cycle found starting at row {i}")
+                return table
+    attributes = {}
+    attributes_table = [[] for _ in range(len(table))]
+    for i, row in enumerate(table[1:], start=1):
+        for j, cell in enumerate(row):
+            if roles[j] == 'attributes' and cell:
                 cell_list = cell.split(';')
                 for cat in cell_list:
                     if cat not in attributes:
                         attributes[cat] = []
                     if i not in attributes[cat]:
-                        attributes[cat].append(i+1)
+                        attributes[cat].append(i)
+                        attributes_table[i].append(cat)
                     else:
-                        warnings.append(f"Warning in row {i+1}, column {j+1}: category {cat!r} already exists for this row")
+                        warnings.append(f"Redundant attribute {cat!r} in row {i}, column {j+1}")
+    pointed_givers = [dict() for _ in range(len(table))]
+    pointed_givers_path = [0 for _ in range(len(table))]
+    pointed_by_all = [list() for i in range(len(table))]
+    for i, row in enumerate(pointed_by_all[1:], start=1):
+        to_check = list(pointed_by[i])
+        while to_check:
+            current = to_check.pop()
+            if current not in row:
+                row.append(current)
+                for cat in attributes_table[i]:
+                    if cat not in attributes_table[current]:
+                        attributes_table[current].append(cat)
+                        attributes[cat].append(current)
+                        pointed_givers[current][cat] = i
+                    elif cat not in pointed_givers[current]:
+                        warnings.append(f"Redundant attribute {cat!r} in row {current} already given by row {i}")
+                if path_index != -1 and table[i][path_index]:
+                    if table[current][path_index] and not pointed_givers_path[current]:
+                        warnings.append(f"Warning in row {current}, column {path_index+1}: path already given by row {i}")
+                    table[current][path_index] = table[i][path_index]
+                    pointed_givers_path[current] = i
+            to_check.extend(pointed_by[current])
+    valid_row_indexes = []
+    new_indexes = list(range(len(table)))
+    staying = [False]
+    new_index = 1
     for i, row in enumerate(table[1:]):
+        staying.append(False)
+        for j, cell in enumerate(row):
+            if roles[j] == 'path':
+                if cell:
+                    valid_row_indexes.append(i+1)
+                    staying[i] = True
+                    new_indexes[i+1] = new_index
+                    new_index += 1
+    for cat in attributes:
+        attributes[cat] = list(filter(lambda x: staying[x], attributes[cat]))
+    for row in pointed_by_all:
+        row[:] = list(filter(lambda x: staying[x], row))
+    instr_table = []
+    dep_pattern = [cell.split('.') for cell in table[0]]
+    for i, row in enumerate(table[1:], start=1):
+        if not staying[i] and not pointed_by[i]:
+            continue
         instr_table.append([])
         for j, cell in enumerate(row):
-            if roles[j] == 'dependencies':
+            if roles[j] == 'dependencies' and cell:
                 cell_list = cell.split(';')
                 for instr in cell_list:
                     if instr:
                         instr_split = instr.split('.')
                         if len(instr_split) != len(dep_pattern[j])-1:
                             errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} does not match dependencies pattern {dep_pattern[j]!r}")
+                            return table
                         if dep_pattern[j]:
                             instr = dep_pattern[j][0] + ''.join([instr_split[i]+dep_pattern[j][i+1] for i in range(len(instr_split))])
                         match = re.match(r'^as far as possible from (\((\d+)\)|(\d+))$', instr)
                         if match:
                             if match.group(2):
                                 number = int(match.group(2))
-                                for r in attributes.get(number, []):
-                                    instr_table[i].append(f"as far as possible from {r}")
+                                if number not in attributes:
+                                    errors.append(f"Error in row {i}, column {j+1}: attribute {number} does not exist")
+                                    return table
+                                for r in attributes[number]:
+                                    instr_table[i].append(f"as far as possible from [{new_indexes[r]}]")
                             else:
-                                instr_table[i].append(instr)
+                                number = int(match.group(3))
+                                if not staying[number]:
+                                    for r in pointed_by_all[number]:
+                                        instr_table[i].append(f"as far as possible from [{new_indexes[r]}]")
+                                else:
+                                    instr_table[i].append(f"as far as possible from [{new_indexes[number]}]")
                         else:
                             try:
                                 instr = get_intervals(instr)
                                 # Pattern to match strings like "[(55)] ..." and capture the number and rest
-                                pattern = r'\[\((\d+)\)\](.*)'
+                                pattern = r'^(.*)\[(\((\d+)\)|(\d+))\](.*)$'
 
-                                match = re.match(pattern, instr)
-                                if match:
-                                    rest_of_string = match.group(2)
-                                    for r in attributes.get(number, []):
-                                        instr_table[i].append(f"[{r}]{rest_of_string}")
-                                else:
-                                    instr_table[i].append(instr)
+                                match2 = re.match(pattern, instr)
+                                if match2:
+                                    if match2.group(2):
+                                        number = int(match2.group(3)[1:-1])
+                                        if number not in attributes:
+                                            errors.append(f"Error in row {i}, column {j+1}: attribute {number} does not exist")
+                                            return table
+                                        for r in attributes[number]:
+                                            instr_table[i].append(f"{match2.group(1)}[{new_indexes[r]}]{match2.group(5)}")
+                                    else:
+                                        number = int(match2.group(4))
+                                        if not staying[number]:
+                                            for r in pointed_by_all[number]:
+                                                instr_table[i].append(f"{match2.group(1)}[{new_indexes[r]}]{match2.group(5)}")
+                                        else:
+                                            instr_table[i].append(f"{match2.group(1)}[{new_indexes[number]}]{match2.group(5)}")
                             except ValueError as e:
                                 print(f"Error parsing instruction '{instr}' in row {i}, column {j}: {e}")
-    not_finished = len(table)-1
-    finished = [False for _ in range(not_finished)]
-    for i, row in enumerate(table[1:]):
-        for j, cell in enumerate(row):
-            if cell:
-                if not cell.strip():
-                    warnings.append(f"Warning in row {i+1}, column {j+1}: only whitespace in cell")
-                if not re.match(r'^(https?://|file://)', cell):
-                    warnings.append(f"Warning in row {i+1}, column {j+1}: {cell!r} is not a valid URL or local path")
-    path_index = roles.index('path') if 'path' in roles else -1
-    pointed_by = [[] for _ in range(len(table))]
-    while not_finished:
-        for i, row in table[1:]:
-            if finished[i]:
-                continue
-            has_unresolved = False
-            for j, cell in enumerate(row):
-                if roles[j] == 'pointers':
-                    instr = cell.split(';')
-                    for instr_item in instr:
-                        try:
-                            if not finished[int(instr_item)-1]:
-                                has_unresolved = True
-                                break
-                        except ValueError:
-                            errors.append(f"Error in row {i+1}, column {j+1}: invalid pointer {instr_item!r}")
-                    if has_unresolved:
-                        break
-            if not has_unresolved:
-                for j, cell in enumerate(row):
-                    if roles[j] == 'pointers':
-                        instr = cell.split(';')
-                        for pointed_row in instr:
-                            pointed_row_nb = int(pointed_row)
-                            instr_table[i] += instr_table[pointed_row_nb]
-                            instr_table[i] = list(set(instr_table[i]))
-                            pointed_by[pointed_row_nb].append(i+1)
-                            if path_index != -1:
-                                if table[pointed_row_nb]:
-                                    if row[path_index]:
-                                        warnings.append(f"Warning: row {i+1} has a path {row[path_index]} but also points to row {pointed_row_nb} with path {table[pointed_row_nb]}.")
-                                    row[path_index] = table[pointed_row_nb][path_index]
-                            for k, cell2 in enumerate(table[pointed_row_nb]):
-                                if roles[k] == 'attributes':
-                                    if cell2:
-                                        atts = cell2.split(';')
-                                        for att in atts:
-                                            if att not in row[k]:
-                                                row[k] += ';' + att
-                finished[i] = True
-                not_finished -= 1
-    new_indexes = []
-    staying = [False]
-    for i, row in enumerate(table[1:]):
-        staying.append(False)
-        for j, cell in enumerate(row):
-            if roles[j] == 'path':
-                if cell:
-                    new_indexes.append(i+1)
-                    staying[i] = True
-    for i, row in enumerate(instr_table):
-        if staying[i+1]:
-            for j, instr in enumerate(row):
-                match1 = re.match(r'^as far as possible from (\d+)$', instr)
-                if match1:
-                    number = int(match1.group(1))
-                else:
-                    match2 = re.match(r'^(.*)\[(\d+)\](.*)$', instr)
-                    number = int(match2.group(2))
-                new_numbers = []
-                if staying[number]:
-                    new_numbers.append(new_indexes.index(number) + 1)
-                else:
-                    
-                for new_number in new_numbers:
-                    if match1:
-                        row[j] = f"as far as possible from {new_number}"
-                    else:
-                        row[j] = f"{match2.group(1)}[{new_number}]{match2.group(3)}"
-    alph = generate_unique_strings(len(table)-1)
+    for i in valid_row_indexes:
+        for p in pointed_by_all[i]:
+            instr_table[p] = list(set(instr_table[p] + instr_table[i]))
+    instr_table_int = []
+    for i in valid_row_indexes:
+        instr_table_int.append(instr_table[i-1])
+    alph = generate_unique_strings(len(valid_row_indexes))
     sorter = ConstraintSorter(alph)
-    go(alph, instr_table, sorter)
+    go(alph, instr_table_int, sorter)
     
     # Solve the problem
     print("Solving constraint-based sorting problem...")
@@ -556,6 +591,8 @@ if __name__ == "__main__":
     import pyperclip
     clipboard_content = pyperclip.paste()
     table = [line.split('\t') for line in clipboard_content.split('\n')]
+    for row in table:
+        row[-1] = row[-1].strip()
     roles = table[0]
     warnings = []
     errors = []
