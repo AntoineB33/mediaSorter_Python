@@ -8,77 +8,63 @@ import math
 from math import inf
 from typing import List, Tuple
 
+PATTERN_DISTANCE = r'^(?P<prefix>as far as possible from )(?P<any>any)?((?P<number>\d+)|(?P<name>.+))(?P<suffix>)$'
+PATTERN_AREAS = r'^(?P<prefix>.*\|)(?P<any>any)?((?P<number>\d+)|(?P<name>.+))(?P<suffix>\|.*)$'
 
-def get_intervals(text: str, errors: List[Tuple[int, int]]) -> str:
-    """
-    Parses a string with a specific format to extract intervals.
+def get_intervals(interval_str):
+    # First, parse the positions of intervals
+    intervals = [[], []]
+    neg_pos = re.split(r'\[(\((\d+)\)|(\d+))\]', interval_str)
+    positive = 0
+    for neg_pos_part in [neg_pos[0], neg_pos[4]]:
+        parts = re.split(r'_', neg_pos_part)
+        for part in parts:
+            if not part:
+                intervals[positive].append((None, None))
+            elif ":" in part:
+                start, end = part.split(':')
+                try:
+                    start = int(start)
+                except:
+                    start = float('inf')
+                try:
+                    end = int(end)
+                except:
+                    end = float('inf')
+                if not positive:
+                    start = -start
+                    end = -end
+                intervals[positive].append((start, end))
+            else:
+                intervals[positive].append((int(part), int(part)))
+        positive = 1
 
-    The function identifies one of four patterns in the input string
-    and applies a unique set of rules for each pattern to calculate
-    the resulting intervals.
-
-    Args:
-        text: The input string containing numbers, brackets, and underscores.
-
-    Returns:
-        A formatted string with the reference number and the calculated intervals.
-    """
-    # First, find the reference number enclosed in brackets, e.g., [55].
-    # This number is part of the output but can also be used in calculations.
-    ref_match = re.search(r'\[(\d+)\]', text)
-    if not ref_match:
-        return "Invalid format: No reference number found."
-    ref_num = int(ref_match.group(1))
+    # Now calculate underscore intervals
+    result = []
+    positive = 0
+    for neg_pos_part in intervals:
+        for i in range(len(neg_pos_part) - 1):
+            end_of_current = neg_pos_part[i][1]
+            start_of_next = neg_pos_part[i+1][0]
+            if end_of_current is None:
+                if not positive:
+                    end_of_current = -float('inf')
+                elif result and result[-1][1] == -1:
+                    end_of_current = result[-1][0] - 1
+                    del result[-1]
+                else:
+                    end_of_current = 0
+            if start_of_next is None:
+                if not positive:
+                    start_of_next = 0
+                else:
+                    start_of_next = float('inf')
+            if start_of_next - end_of_current <= 1:
+                raise ValueError("Invalid interval: overlapping or adjacent intervals found.")
+            result.append((end_of_current + 1, start_of_next - 1))
+        positive = 1
     
-    intervals = []
-
-    # The logic is based on matching the entire string against specific patterns.
-    # Each pattern has a unique way of generating intervals.
-
-    # Pattern 1: Matches strings like "_6-2_[55]_4-7_9-"
-    p1_match = re.fullmatch(r'_(\d+)-(\d+)_\[\d+\]_(\d+)-(\d+)_(\d+)-', text)
-    if p1_match:
-        a, b, c, d, e = map(int, p1_match.groups())
-        # The rules for this pattern were derived by reverse-engineering the example.
-        # First interval: (-inf, b-e)
-        intervals.append(f"(-float('inf'), {b - e})")
-        # Second interval: (a-d, e-a)
-        intervals.append(f"({a - d}, {e - a})")
-        # Third interval: (a+b, a+b)
-        intervals.append(f"({a + b}, {a + b})")
-        
-    # Pattern 2: Matches strings like "_[140]-1_8-9_"
-    elif re.fullmatch(r'_\[\d+\]-\d+_\d+-\d+_', text):
-        # This is a more robust way to extract numbers for this specific pattern.
-        nums = re.findall(r'(\d+)', text)
-        # The first number found is the ref_num, followed by a, b, c.
-        a, b, c = map(int, nums[1:])
-        a = -a  # The number after '[ref]-' is treated as negative.
-        
-        # First interval is always (-inf, 0) for this pattern.
-        intervals.append("(-float('inf'), 0)")
-        # Second interval: (c-b-a, b+a)
-        intervals.append(f"({c - b - a}, {b + a})")
-        # Third interval: (c-a, +inf)
-        intervals.append(f"({c - a}, float('inf'))")
-
-    # Pattern 3: Matches the simple case "_[78]-"
-    elif re.fullmatch(r'_\[\d+\]-', text):
-        # This pattern always results in a single interval from -inf to 0.
-        intervals.append("(-float('inf'), 0)")
-
-    # Pattern 4: Matches strings like "_5-[2]_"
-    elif re.fullmatch(r'_(\d+)-\[\d+\]_', text):
-        p4_match = re.fullmatch(r'_(\d+)-\[\d+\]_', text)
-        a = int(p4_match.group(1))
-        
-        # First interval: (-inf, a+1)
-        intervals.append(f"(-float('inf'), {a + 1})")
-        # Second interval: (ref_num-1, +inf)
-        intervals.append(f"({ref_num - 1}, float('inf'))")
-        
-    # Join the reference number and all found intervals into the final string.
-    return f"[{ref_num}] {', '.join(intervals)}"
+    return "[" + neg_pos[1] + "] " + ', '.join(f"({start}, {end})" for start, end in result)
 
 def generate_unique_strings(n):
     charset = string.ascii_lowercase  # you can expand this (e.g. add digits or uppercase)
@@ -375,19 +361,23 @@ class ConstraintSorter:
         return best_arrangement
 
 def order_table(res, table, roles):
-    res.insert(0, -1)
-    old_to_new = {old_index+1: new_index+1 for new_index, old_index in enumerate(res)}
-    new_table = []
-    for old_index in res:
-        original_row = table[old_index+1]
+    new_pos = [0] * len(table)
+    for i, old_index in enumerate(res):
+        new_pos[old_index+1] = i+1
+    new_table = [table[0]]
+    for original_row in table[1:]:
         new_row = []
         for j, cell in enumerate(original_row):
             if roles[j] == 'dependencies':
-                if isinstance(cell, str):
-                    updated_cell = re.sub(r'\d+', lambda m: str(old_to_new[int(m.group(0))]), cell)
-                    new_row.append(updated_cell)
-                else:
-                    new_row.append(cell)
+                updated_cell = cell.split(';')
+                for d, instr in enumerate(list(updated_cell)):
+                        match = re.match(PATTERN_DISTANCE, instr)
+                        if not match:
+                            match = re.match(PATTERN_AREAS, instr)
+                        if match.group("number"):
+                            number = int(match.group("number"))
+                            updated_cell[d].append(f"{match.group('prefix')}{"any" if match.group('any') else ''}{new_pos[number]}{match.group('suffix')}")
+                new_row.append(updated_cell)
             else:
                 new_row.append(cell)
         new_table.append(new_row)
@@ -405,7 +395,7 @@ def sorter(table, roles, errors, warnings):
                     warnings.append(f"Warning in row {i+1}, column {path_index+1}: {cell!r} is not a valid URL or local path")
     pointed_by = [[] for _ in range(len(table))]
     point_to = [[] for _ in range(len(table))]
-    for i, row in enumerate(table[1:]):
+    for i, row in enumerate(table[1:], start=1):
         for j, cell in enumerate(row):
             if roles[j] == 'pointers':
                 if cell:
@@ -414,13 +404,13 @@ def sorter(table, roles, errors, warnings):
                         try:
                             k = int(instr)
                             if k < 1 or k > len(table)-1:
-                                errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} points to an invalid row {k}")
+                                errors.append(f"Error in row {i}, column {j+1}: {instr!r} points to an invalid row {k}")
                                 return table
                             else:
-                                pointed_by[k].append(i+1)
-                                point_to[i+1].append(k)
+                                pointed_by[k].append(i)
+                                point_to[i].append(k)
                         except ValueError:
-                            errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} is not a valid pointer")
+                            errors.append(f"Error in row {i}, column {j+1}: {instr!r} is not a valid pointer")
                             return table
     # find a cycle
     def dfs(node, visited, stack):
@@ -443,9 +433,10 @@ def sorter(table, roles, errors, warnings):
                 return table
     attributes = {}
     attributes_table = [[] for _ in range(len(table))]
+    names = [[] for _ in range(len(table))]
     for i, row in enumerate(table[1:], start=1):
         for j, cell in enumerate(row):
-            if roles[j] == 'attributes' and cell:
+            if roles[j] == 'attributes':
                 cell_list = cell.split(';')
                 for cat in cell_list:
                     if cat not in attributes:
@@ -455,15 +446,24 @@ def sorter(table, roles, errors, warnings):
                         attributes_table[i].append(cat)
                     else:
                         warnings.append(f"Redundant attribute {cat!r} in row {i}, column {j+1}")
+            elif roles[j] == 'names':
+                cell_list = cell.split(';')
+                for name in cell_list:
+                    if name not in names[i]:
+                        names[i].append(name)
+                    else:
+                        warnings.append(f"Redundant name {name!r} in row {i}, column {j+1}")
     pointed_givers = [dict() for _ in range(len(table))]
     pointed_givers_path = [0 for _ in range(len(table))]
     pointed_by_all = [list() for i in range(len(table))]
+    point_to_all = [list() for i in range(len(table))]
     for i, row in enumerate(pointed_by_all[1:], start=1):
         to_check = list(pointed_by[i])
         while to_check:
             current = to_check.pop()
             if current not in row:
                 row.append(current)
+                point_to_all[current].append(i)
                 for cat in attributes_table[i]:
                     if cat not in attributes_table[current]:
                         attributes_table[current].append(cat)
@@ -479,27 +479,29 @@ def sorter(table, roles, errors, warnings):
             to_check.extend(pointed_by[current])
     valid_row_indexes = []
     new_indexes = list(range(len(table)))
+    to_old_indexes = []
     staying = [False]
+    cat_rows = []
     new_index = 1
-    for i, row in enumerate(table[1:]):
+    for i, row in enumerate(table[1:], start=1):
         staying.append(False)
-        for j, cell in enumerate(row):
-            if roles[j] == 'path':
-                if cell:
-                    valid_row_indexes.append(i+1)
-                    staying[i] = True
-                    new_indexes[i+1] = new_index
-                    new_index += 1
+        if path_index != -1 and row[path_index]:
+            valid_row_indexes.append(i)
+            staying[i] = True
+            new_indexes[i] = new_index
+            new_index += 1
+            to_old_indexes.append(i)
+        else:
+            cat_rows.append(i)
     for cat in attributes:
         attributes[cat] = list(filter(lambda x: staying[x], attributes[cat]))
     for row in pointed_by_all:
         row[:] = list(filter(lambda x: staying[x], row))
-    instr_table = []
+    instr_table = [[] for _ in range(len(table))]
     dep_pattern = [cell.split('.') for cell in table[0]]
     for i, row in enumerate(table[1:], start=1):
         if not staying[i] and not pointed_by[i]:
             continue
-        instr_table.append([])
         for j, cell in enumerate(row):
             if roles[j] == 'dependencies' and cell:
                 cell_list = cell.split(';')
@@ -511,46 +513,44 @@ def sorter(table, roles, errors, warnings):
                             return table
                         if dep_pattern[j]:
                             instr = dep_pattern[j][0] + ''.join([instr_split[i]+dep_pattern[j][i+1] for i in range(len(instr_split))])
-                        match = re.match(r'^as far as possible from (\((\d+)\)|(\d+))$', instr)
-                        if match:
-                            if match.group(2):
-                                number = int(match.group(2))
-                                if number not in attributes:
-                                    errors.append(f"Error in row {i}, column {j+1}: attribute {number} does not exist")
-                                    return table
-                                for r in attributes[number]:
-                                    instr_table[i].append(f"as far as possible from [{new_indexes[r]}]")
+                        match = re.match(PATTERN_DISTANCE, instr)
+                        if not match:
+                            match = re.match(PATTERN_AREAS, instr)
+                            if not match:
+                                errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} does not match expected format")
+                                return table
+                        any_str = "any" if match.group("any") else ""
+                        numbers = []
+                        if match.group("number"):
+                            number = int(match.group("number"))
+                            if number == 0 or number > len(table):
+                                errors.append(f"Error in row {i}, column {j+1}: invalid number.")
+                                return table
+                            if staying[number]:
+                                numbers.append(number)
+                            for pointer in pointed_by_all[number]:
+                                numbers.append(pointer)
+                        elif name := match.group("name"):
+                            if name in attributes:
+                                for r in attributes[name]:
+                                    numbers.append(r)
                             else:
-                                number = int(match.group(3))
-                                if not staying[number]:
-                                    for r in pointed_by_all[number]:
-                                        instr_table[i].append(f"as far as possible from [{new_indexes[r]}]")
+                                for ii, rrow in enumerate(names[1:], start=1):
+                                    if name in rrow:
+                                        number = ii
+                                        if staying[number]:
+                                            numbers.append(number)
+                                        for pointer in pointed_by_all[number]:
+                                            numbers.append(pointer)
+                                        break
                                 else:
-                                    instr_table[i].append(f"as far as possible from [{new_indexes[number]}]")
+                                    errors.append(f"Error in row {i+1}, column {j+1}: attribute {name!r} does not exist")
+                                    return table
                         else:
-                            try:
-                                instr = get_intervals(instr)
-                                # Pattern to match strings like "[(55)] ..." and capture the number and rest
-                                pattern = r'^(.*)\[(\((\d+)\)|(\d+))\](.*)$'
-
-                                match2 = re.match(pattern, instr)
-                                if match2:
-                                    if match2.group(2):
-                                        number = int(match2.group(3)[1:-1])
-                                        if number not in attributes:
-                                            errors.append(f"Error in row {i}, column {j+1}: attribute {number} does not exist")
-                                            return table
-                                        for r in attributes[number]:
-                                            instr_table[i].append(f"{match2.group(1)}[{new_indexes[r]}]{match2.group(5)}")
-                                    else:
-                                        number = int(match2.group(4))
-                                        if not staying[number]:
-                                            for r in pointed_by_all[number]:
-                                                instr_table[i].append(f"{match2.group(1)}[{new_indexes[r]}]{match2.group(5)}")
-                                        else:
-                                            instr_table[i].append(f"{match2.group(1)}[{new_indexes[number]}]{match2.group(5)}")
-                            except ValueError as e:
-                                print(f"Error parsing instruction '{instr}' in row {i}, column {j}: {e}")
+                            errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} does not match expected format")
+                            return table
+                        for number in numbers:
+                            instr_table[i].append(f"{match.group('prefix')}{any_str}{number}{match.group('suffix')}")
     for i in valid_row_indexes:
         for p in pointed_by_all[i]:
             instr_table[p] = list(set(instr_table[p] + instr_table[i]))
@@ -580,9 +580,20 @@ def sorter(table, roles, errors, warnings):
     for i, elem in enumerate(solution):
         print(f"Position {i}: {elem}")
     
-    res = [alph.index(elem) for elem in solution]
-    new_table = order_table(res, table)
-    new_table.insert(0, table[0])  # Add header back
+    res = [to_old_indexes[alph.index(elem)]-1 for elem in solution]
+    i = 0
+    while i < len(res):
+        d = 0
+        while d < len(cat_rows):
+            e = cat_rows[d]
+            if e in point_to_all[res[i]+1]:
+                res.insert(i, e-1)
+                i += 1
+                del cat_rows[d]
+            else:
+                d += 1
+        i += 1
+    new_table = order_table(res, table, roles)
     return new_table
 
 
@@ -597,6 +608,7 @@ if __name__ == "__main__":
     warnings = []
     errors = []
     result = sorter(table[1:], roles, errors, warnings)
+    result.insert(0, roles)
     if errors:
         print("Errors found:")
         for error in errors:

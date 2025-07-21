@@ -12,14 +12,15 @@ def get_intervals(interval_str):
             if not part:
                 intervals[positive].append((None, None))
             elif ":" in part:
-                if part.startswith(':'):
+                start, end = part.split(':')
+                try:
+                    start = int(start)
+                except:
                     start = float('inf')
-                    end = int(part[1:])
-                elif part.endswith(':'):
-                    start = int(part[:-1])
+                try:
+                    end = int(end)
+                except:
                     end = float('inf')
-                else:
-                    start, end = map(int, part.split(':'))
                 if not positive:
                     start = -start
                     end = -end
@@ -39,7 +40,7 @@ def get_intervals(interval_str):
                 if not positive:
                     end_of_current = -float('inf')
                 elif result and result[-1][1] == -1:
-                    end_of_current = result[-1][0]
+                    end_of_current = result[-1][0] - 1
                     del result[-1]
                 else:
                     end_of_current = 0
@@ -57,3 +58,4 @@ def get_intervals(interval_str):
 
 # Examples
 print(get_intervals(":2_[45]_8:"))
+print(get_intervals(":[2]_4:5_7:"))
