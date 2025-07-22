@@ -11,12 +11,35 @@ from typing import List, Tuple
 PATTERN_DISTANCE = r'^(?P<prefix>as far as possible from )(?P<any>any)?((?P<number>\d+)|(?P<name>.+))(?P<suffix>)$'
 PATTERN_AREAS = r'^(?P<prefix>.*\|)(?P<any>any)?((?P<number>\d+)|(?P<name>.+))(?P<suffix>\|.*)$'
 
+class instr_struct:
+    def __init__(self, instr_type: int, any: bool, numbers: List[int], intervals: List[Tuple[int, int]] = None):
+        self.instr_type = instr_type
+        self.any = any
+        self.numbers = numbers
+        self.intervals = intervals
+
+    def __eq__(self, other):
+        if not isinstance(other, instr_struct):
+            return False
+        return (self.instr_type == other.instr_type and
+                self.any == other.any and
+                sorted(self.numbers) == sorted(other.numbers) and
+                sorted(self.intervals) == sorted(other.intervals))
+
+    def __hash__(self):
+        return hash((
+            self.instr_type,
+            self.any,
+            tuple(sorted(self.numbers)),
+            tuple(sorted(self.intervals))
+        ))
+
 def get_intervals(interval_str):
     # First, parse the positions of intervals
     intervals = [[], []]
-    neg_pos = re.split(r'\[(\((\d+)\)|(\d+))\]', interval_str)
+    neg_pos = interval_str.split('|')
     positive = 0
-    for neg_pos_part in [neg_pos[0], neg_pos[4]]:
+    for neg_pos_part in [neg_pos[0], neg_pos[2]]:
         parts = re.split(r'_', neg_pos_part)
         for part in parts:
             if not part:
@@ -64,7 +87,7 @@ def get_intervals(interval_str):
             result.append((end_of_current + 1, start_of_next - 1))
         positive = 1
     
-    return "[" + neg_pos[1] + "] " + ', '.join(f"({start}, {end})" for start, end in result)
+    return result
 
 def generate_unique_strings(n):
     charset = string.ascii_lowercase  # you can expand this (e.g. add digits or uppercase)
@@ -78,79 +101,24 @@ def generate_unique_strings(n):
                 return result
         length += 1
 
-def parse_intervals(intervals_part: str):
-    """
-    Given a string like "(-10, -6), (-2, 4), (7, float('inf')), (-float('inf'), 2)",
-    returns a list of (lo, hi) tuples, with ±math.inf if 'inf' is present.
-    """
-    def to_num(s: str) -> float:
-        s = s.strip()
-        if 'inf' in s:
-            return -math.inf if s.startswith('-') else math.inf
-        return float(s)
-
-    intervals = []
-    i = 0
-    n = len(intervals_part)
-    while i < n:
-        if intervals_part[i] == '(':
-            depth = 1
-            start = i + 1
-            i += 1
-            while i < n and depth > 0:
-                if intervals_part[i] == '(':
-                    depth += 1
-                elif intervals_part[i] == ')':
-                    depth -= 1
-                i += 1
-            chunk = intervals_part[start:i-1].strip()
-
-            # Split on the top‑level comma
-            depth2 = 0
-            for j, c in enumerate(chunk):
-                if c == '(':
-                    depth2 += 1
-                elif c == ')':
-                    depth2 -= 1
-                elif c == ',' and depth2 == 0:
-                    lo_str, hi_str = chunk[:j], chunk[j+1:]
-                    break
-            else:
-                raise ValueError(f"Malformed interval (no top-level comma): {chunk!r}")
-
-            lo = to_num(lo_str)
-            hi = to_num(hi_str)
-            intervals.append((lo, hi))
-        else:
-            i += 1
-    return intervals
-
 def go(strings, instructions, sorter):
     for idx, inst_list in enumerate(instructions):
         current = strings[idx]
         for inst in inst_list:
-            inst = inst.strip()
-            if not inst:
-                continue
-
+            targets = inst.numbers
+            for i, number in enumerate(targets):
+                targets[i] = strings[number - 1]
             # Forbidden constraint
-            m = re.match(r"^\[(\d+)\]\s*(.*)$", inst)
-            if m:
-                tgt_idx = int(m.group(1)) - 1
-                target = strings[tgt_idx]
-                intervals = parse_intervals(m.group(2))
-                sorter.add_forbidden_constraint(current, target, intervals)
-                continue
-
-            # Maximize distance
-            m2 = re.match(r"^as far as possible from\s+(\d+)$", inst)
-            if m2:
-                tgt_idx = int(m2.group(1)) - 1
-                target = strings[tgt_idx]
-                sorter.add_maximize_distance_constraint(current, target)
-                continue
-
-            raise ValueError(f"Unrecognized instruction: {inst}")
+            if inst.instr_type:
+                if inst.any:
+                    sorter.add_forbidden_constraint_any_y(current, targets, inst.intervals)
+                else:
+                    for target in targets:
+                        sorter.add_forbidden_constraint(current, target, inst.intervals)
+            else:
+                # Maximizing distance constraint
+                for target in targets:
+                    sorter.add_maximize_distance_constraint(current, target)
 
 class ConstraintSorter:
     def __init__(self, elements: List[str]):
@@ -360,39 +328,60 @@ class ConstraintSorter:
 
         return best_arrangement
 
-def order_table(res, table, roles):
+def order_table(res, table, roles, dep_pattern):
     new_pos = [0] * len(table)
     for i, old_index in enumerate(res):
-        new_pos[old_index+1] = i+1
-    new_table = [table[0]]
-    for original_row in table[1:]:
+        new_pos[old_index] = i
+    updated_roles = [False] * len(roles)
+    for row in table[1:]:
         new_row = []
-        for j, cell in enumerate(original_row):
+        for j, cell in enumerate(row):
             if roles[j] == 'dependencies':
-                updated_cell = cell.split(';')
-                for d, instr in enumerate(list(updated_cell)):
+                if cell:
+                    updated_cell = cell.split(';')
+                    for d, instr in enumerate(list(updated_cell)):
+                        instr_split = instr.split('.')
+                        if dep_pattern[j]:
+                            instr = dep_pattern[j][0] + ''.join([instr_split[i]+dep_pattern[j][i+1] for i in range(len(instr_split))])
                         match = re.match(PATTERN_DISTANCE, instr)
                         if not match:
                             match = re.match(PATTERN_AREAS, instr)
                         if match.group("number"):
                             number = int(match.group("number"))
-                            updated_cell[d].append(f"{match.group('prefix')}{"any" if match.group('any') else ''}{new_pos[number]}{match.group('suffix')}")
-                new_row.append(updated_cell)
-            else:
-                new_row.append(cell)
-        new_table.append(new_row)
-    return new_table
+                            new_instr = f"{match.group('prefix')}{"any" if match.group('any') else ''}{new_pos[number]}{match.group('suffix')}"
+                            prefix = f"{match.group('prefix')}{"any" if match.group('any') else ''}"
+                            str_len = 0
+                            prev_str_len = 0
+                            id = 0
+                            id2 = 0
+                            while id < len(new_pos) and str_len < len(prefix):
+                                prev_str_len = str_len
+                                if id == id2:
+                                    str_len += len(dep_pattern[j][id])
+                                    id += 1
+                                else:
+                                    str_len += len(instr_split[id2])
+                                    id2 += 1
+                            if id == id2:
+                                instr_split[id2-1] = new_instr[prev_str_len:str_len]
+                                updated_cell[d] = '.'.join(instr_split)
+                            elif not updated_roles[j]:
+                                dep_pattern[j][id-1] = new_instr[prev_str_len:str_len]
+                                updated_roles[j] = True
+                    row[j] = ';'.join(updated_cell)
+    return table
 
 def sorter(table, roles, errors, warnings):
+    alph = generate_unique_strings(max(len(roles), len(table)))
     path_index = roles.index('path') if 'path' in roles else -1
     if path_index != -1:
         for i, row in enumerate(table[1:]):
             cell = row[path_index]
             if cell:
                 if not cell.strip():
-                    warnings.append(f"Warning in row {i+1}, column {path_index+1}: only whitespace in cell")
+                    warnings.append(f"Warning in row {i+1}, column {alph[path_index]}: only whitespace in cell")
                 if not re.match(r'^(https?://|file://)', cell):
-                    warnings.append(f"Warning in row {i+1}, column {path_index+1}: {cell!r} is not a valid URL or local path")
+                    warnings.append(f"Warning in row {i+1}, column {alph[path_index]}: {cell!r} is not a valid URL or local path")
     pointed_by = [[] for _ in range(len(table))]
     point_to = [[] for _ in range(len(table))]
     for i, row in enumerate(table[1:], start=1):
@@ -404,13 +393,13 @@ def sorter(table, roles, errors, warnings):
                         try:
                             k = int(instr)
                             if k < 1 or k > len(table)-1:
-                                errors.append(f"Error in row {i}, column {j+1}: {instr!r} points to an invalid row {k}")
+                                errors.append(f"Error in row {i}, column {alph[j]}: {instr!r} points to an invalid row {k}")
                                 return table
                             else:
                                 pointed_by[k].append(i)
                                 point_to[i].append(k)
                         except ValueError:
-                            errors.append(f"Error in row {i}, column {j+1}: {instr!r} is not a valid pointer")
+                            errors.append(f"Error in row {i}, column {alph[j]}: {instr!r} is not a valid pointer")
                             return table
     # find a cycle
     def dfs(node, visited, stack):
@@ -437,22 +426,32 @@ def sorter(table, roles, errors, warnings):
     for i, row in enumerate(table[1:], start=1):
         for j, cell in enumerate(row):
             if roles[j] == 'attributes':
+                if not cell:
+                    continue
                 cell_list = cell.split(';')
                 for cat in cell_list:
                     if cat not in attributes:
+                        if not cat:
+                            errors.append(f"Error in row {i}, column {alph[j]}: empty attribute name")
+                            return table
                         attributes[cat] = []
                     if i not in attributes[cat]:
                         attributes[cat].append(i)
                         attributes_table[i].append(cat)
                     else:
-                        warnings.append(f"Redundant attribute {cat!r} in row {i}, column {j+1}")
+                        warnings.append(f"Redundant attribute {cat!r} in row {i}, column {alph[j]}")
             elif roles[j] == 'names':
                 cell_list = cell.split(';')
                 for name in cell_list:
                     if name not in names[i]:
                         names[i].append(name)
                     else:
-                        warnings.append(f"Redundant name {name!r} in row {i}, column {j+1}")
+                        warnings.append(f"Redundant name {name!r} in row {i}, column {alph[j]}")
+    for cat in attributes:
+        for row in names:
+            if cat in row:
+                errors.append(f"Error: attribute {cat!r} in row {attributes[cat][0]} conflicts with name in row {row[0]}")
+                return table
     pointed_givers = [dict() for _ in range(len(table))]
     pointed_givers_path = [0 for _ in range(len(table))]
     pointed_by_all = [list() for i in range(len(table))]
@@ -473,7 +472,7 @@ def sorter(table, roles, errors, warnings):
                         warnings.append(f"Redundant attribute {cat!r} in row {current} already given by row {i}")
                 if path_index != -1 and table[i][path_index]:
                     if table[current][path_index] and not pointed_givers_path[current]:
-                        warnings.append(f"Warning in row {current}, column {path_index+1}: path already given by row {i}")
+                        warnings.append(f"Warning in row {current}, column {alph[path_index]}: path already given by row {i}")
                     table[current][path_index] = table[i][path_index]
                     pointed_givers_path[current] = i
             to_check.extend(pointed_by[current])
@@ -509,22 +508,23 @@ def sorter(table, roles, errors, warnings):
                     if instr:
                         instr_split = instr.split('.')
                         if len(instr_split) != len(dep_pattern[j])-1:
-                            errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} does not match dependencies pattern {dep_pattern[j]!r}")
+                            errors.append(f"Error in row {i+1}, column {alph[j]}: {instr!r} does not match dependencies pattern {dep_pattern[j]!r}")
                             return table
                         if dep_pattern[j]:
                             instr = dep_pattern[j][0] + ''.join([instr_split[i]+dep_pattern[j][i+1] for i in range(len(instr_split))])
                         match = re.match(PATTERN_DISTANCE, instr)
-                        if not match:
+                        intervals = []
+                        if instr_type := not match:
                             match = re.match(PATTERN_AREAS, instr)
                             if not match:
-                                errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} does not match expected format")
+                                errors.append(f"Error in row {i+1}, column {alph[j]}: {instr!r} does not match expected format")
                                 return table
-                        any_str = "any" if match.group("any") else ""
+                            intervals = get_intervals(instr)
                         numbers = []
                         if match.group("number"):
                             number = int(match.group("number"))
                             if number == 0 or number > len(table):
-                                errors.append(f"Error in row {i}, column {j+1}: invalid number.")
+                                errors.append(f"Error in row {i}, column {alph[j]}: invalid number.")
                                 return table
                             if staying[number]:
                                 numbers.append(number)
@@ -544,21 +544,19 @@ def sorter(table, roles, errors, warnings):
                                             numbers.append(pointer)
                                         break
                                 else:
-                                    errors.append(f"Error in row {i+1}, column {j+1}: attribute {name!r} does not exist")
+                                    errors.append(f"Error in row {i+1}, column {alph[j]}: attribute {name!r} does not exist")
                                     return table
                         else:
-                            errors.append(f"Error in row {i+1}, column {j+1}: {instr!r} does not match expected format")
+                            errors.append(f"Error in row {i+1}, column {alph[j]}: {instr!r} does not match expected format")
                             return table
-                        for number in numbers:
-                            instr_table[i].append(f"{match.group('prefix')}{any_str}{number}{match.group('suffix')}")
+                        instr_table[i].append(instr_struct(instr_type, match.group("any"), numbers, intervals))
     for i in valid_row_indexes:
         for p in pointed_by_all[i]:
             instr_table[p] = list(set(instr_table[p] + instr_table[i]))
     instr_table_int = []
     for i in valid_row_indexes:
         instr_table_int.append(instr_table[i-1])
-    alph = generate_unique_strings(len(valid_row_indexes))
-    sorter = ConstraintSorter(alph)
+    sorter = ConstraintSorter(alph[:len(valid_row_indexes)])
     go(alph, instr_table_int, sorter)
     
     # Solve the problem
@@ -579,21 +577,21 @@ def sorter(table, roles, errors, warnings):
     print("\nPositions:")
     for i, elem in enumerate(solution):
         print(f"Position {i}: {elem}")
-    
-    res = [to_old_indexes[alph.index(elem)]-1 for elem in solution]
+
+    res = [0] + [to_old_indexes[alph.index(elem)] for elem in solution]
     i = 0
     while i < len(res):
         d = 0
         while d < len(cat_rows):
             e = cat_rows[d]
-            if e in point_to_all[res[i]+1]:
-                res.insert(i, e-1)
+            if e in point_to_all[res[i]]:
+                res.insert(i, e)
                 i += 1
                 del cat_rows[d]
             else:
                 d += 1
         i += 1
-    new_table = order_table(res, table, roles)
+    new_table = order_table(res, table, roles, dep_pattern)
     return new_table
 
 
