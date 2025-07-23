@@ -3,6 +3,7 @@ import random
 class RoleTypes:
     NAMES = "names"
     DEPENDENCIES = "dependencies"
+    ATTRIBUTES_TO_SPRAWL = "attributes_to_sprawl"
     ATTRIBUTES = "attributes"
     POINTERS = "pointers"
     PATH = "path"

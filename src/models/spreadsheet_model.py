@@ -63,7 +63,7 @@ class SpreadsheetModel(QAbstractTableModel):
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._selected_row = -1
         self._selected_column = -1
-        self._role_types = [RoleTypes.NAMES, RoleTypes.DEPENDENCIES, RoleTypes.ATTRIBUTES, RoleTypes.POINTERS, RoleTypes.PATH]
+        self._role_types = [RoleTypes.NAMES, RoleTypes.DEPENDENCIES, RoleTypes.ATTRIBUTES, RoleTypes.ATTRIBUTES_TO_SPRAWL, RoleTypes.POINTERS, RoleTypes.PATH]
 
         
         if not Path("data").exists():
@@ -246,6 +246,8 @@ class SpreadsheetModel(QAbstractTableModel):
             return "lightblue"
         elif self._roles[column] == RoleTypes.DEPENDENCIES:
             return "lightgreen"
+        elif self._roles[column] == RoleTypes.ATTRIBUTES_TO_SPRAWL:
+            return "lightgray"
         elif self._roles[column] == RoleTypes.ATTRIBUTES:
             return "lightyellow"
         elif self._roles[column] == RoleTypes.POINTERS:

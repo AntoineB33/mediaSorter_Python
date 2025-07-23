@@ -39,6 +39,18 @@ class ConstraintSorter:
         Add a constraint that elements x and y should be as far apart as possible.
         """
         self.maximize_distance.append((x, y))
+    
+    def add_group_maximize(self, index_set: Set[int]):
+        """
+        For every unordered pair of indices in index_set, add a
+        maximize_distance constraint between the corresponding elements.
+        """
+        # Map indices to element names
+        names = [self.elements[i] for i in index_set]
+        # For each pair (a, b) add both directions to maximize distance
+        for u, v in itertools.combinations(names, 2):
+            self.add_maximize_distance_constraint(u, v)
+
 
     def is_valid_placement(self, arrangement: List[str]) -> bool:
         """Check if an arrangement satisfies all constraints."""

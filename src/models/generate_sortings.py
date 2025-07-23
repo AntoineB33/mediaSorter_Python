@@ -1,11 +1,8 @@
 import re
 import random
-from typing import List, Tuple, Dict, Set
-from collections import defaultdict
+from typing import List, Tuple, Set
 import itertools
 import string
-import math
-from math import inf
 from typing import List, Tuple
 
 PATTERN_DISTANCE = r'^(?P<prefix>as far as possible from )(?P<any>any)?((?P<number>\d+)|(?P<name>.+))(?P<suffix>)$'
@@ -33,92 +30,6 @@ class instr_struct:
             tuple(sorted(self.numbers)),
             tuple(sorted(self.intervals))
         ))
-
-def get_intervals(interval_str):
-    # First, parse the positions of intervals
-    intervals = [[], []]
-    neg_pos = interval_str.split('|')
-    positive = 0
-    for neg_pos_part in [neg_pos[0], neg_pos[2]]:
-        parts = re.split(r'_', neg_pos_part)
-        for part in parts:
-            if not part:
-                intervals[positive].append((None, None))
-            elif ":" in part:
-                start, end = part.split(':')
-                try:
-                    start = int(start)
-                except:
-                    start = float('inf')
-                try:
-                    end = int(end)
-                except:
-                    end = float('inf')
-                if not positive:
-                    start = -start
-                    end = -end
-                intervals[positive].append((start, end))
-            else:
-                intervals[positive].append((int(part), int(part)))
-        positive = 1
-
-    # Now calculate underscore intervals
-    result = []
-    positive = 0
-    for neg_pos_part in intervals:
-        for i in range(len(neg_pos_part) - 1):
-            end_of_current = neg_pos_part[i][1]
-            start_of_next = neg_pos_part[i+1][0]
-            if end_of_current is None:
-                if not positive:
-                    end_of_current = -float('inf')
-                elif result and result[-1][1] == -1:
-                    end_of_current = result[-1][0] - 1
-                    del result[-1]
-                else:
-                    end_of_current = 0
-            if start_of_next is None:
-                if not positive:
-                    start_of_next = 0
-                else:
-                    start_of_next = float('inf')
-            if start_of_next - end_of_current <= 1:
-                raise ValueError("Invalid interval: overlapping or adjacent intervals found.")
-            result.append((end_of_current + 1, start_of_next - 1))
-        positive = 1
-    
-    return result
-
-def generate_unique_strings(n):
-    charset = string.ascii_lowercase  # you can expand this (e.g. add digits or uppercase)
-    result = []
-    length = 1
-
-    while len(result) < n:
-        for combo in itertools.product(charset, repeat=length):
-            result.append(''.join(combo))
-            if len(result) == n:
-                return result
-        length += 1
-
-def go(strings, instructions, sorter):
-    for idx, inst_list in enumerate(instructions):
-        current = strings[idx]
-        for inst in inst_list:
-            targets = inst.numbers
-            for i, number in enumerate(targets):
-                targets[i] = strings[number - 1]
-            # Forbidden constraint
-            if inst.instr_type:
-                if inst.any:
-                    sorter.add_forbidden_constraint_any_y(current, targets, inst.intervals)
-                else:
-                    for target in targets:
-                        sorter.add_forbidden_constraint(current, target, inst.intervals)
-            else:
-                # Maximizing distance constraint
-                for target in targets:
-                    sorter.add_maximize_distance_constraint(current, target)
 
 class ConstraintSorter:
     def __init__(self, elements: List[str]):
@@ -157,6 +68,18 @@ class ConstraintSorter:
         Add a constraint that elements x and y should be as far apart as possible.
         """
         self.maximize_distance.append((x, y))
+    
+    def add_group_maximize(self, index_set: Set[int]):
+        """
+        For every unordered pair of indices in index_set, add a
+        maximize_distance constraint between the corresponding elements.
+        """
+        # Map indices to element names
+        names = [self.elements[i] for i in index_set]
+        # For each pair (a, b) add both directions to maximize distance
+        for u, v in itertools.combinations(names, 2):
+            self.add_maximize_distance_constraint(u, v)
+
 
     def is_valid_placement(self, arrangement: List[str]) -> bool:
         """Check if an arrangement satisfies all constraints."""
@@ -328,13 +251,100 @@ class ConstraintSorter:
 
         return best_arrangement
 
+def get_intervals(interval_str):
+    # First, parse the positions of intervals
+    intervals = [[], []]
+    neg_pos = interval_str.split('|')
+    positive = 0
+    for neg_pos_part in [neg_pos[0], neg_pos[2]]:
+        parts = re.split(r'_', neg_pos_part)
+        for part in parts:
+            if not part:
+                intervals[positive].append((None, None))
+            elif ":" in part:
+                start, end = part.split(':')
+                try:
+                    start = int(start)
+                except:
+                    start = float('inf')
+                try:
+                    end = int(end)
+                except:
+                    end = float('inf')
+                if not positive:
+                    start = -start
+                    end = -end
+                intervals[positive].append((start, end))
+            else:
+                intervals[positive].append((int(part), int(part)))
+        positive = 1
+
+    # Now calculate underscore intervals
+    result = []
+    positive = 0
+    for neg_pos_part in intervals:
+        for i in range(len(neg_pos_part) - 1):
+            end_of_current = neg_pos_part[i][1]
+            start_of_next = neg_pos_part[i+1][0]
+            if end_of_current is None:
+                if not positive:
+                    end_of_current = -float('inf')
+                elif result and result[-1][1] == -1:
+                    end_of_current = result[-1][0] - 1
+                    del result[-1]
+                else:
+                    end_of_current = 0
+            if start_of_next is None:
+                if not positive:
+                    start_of_next = 0
+                else:
+                    start_of_next = float('inf')
+            if start_of_next - end_of_current <= 1:
+                raise ValueError("Invalid interval: overlapping or adjacent intervals found.")
+            result.append((end_of_current + 1, start_of_next - 1))
+        positive = 1
+    
+    return result
+
+def generate_unique_strings(n):
+    charset = string.ascii_lowercase  # you can expand this (e.g. add digits or uppercase)
+    result = []
+    length = 1
+
+    while len(result) < n:
+        for combo in itertools.product(charset, repeat=length):
+            result.append(''.join(combo))
+            if len(result) == n:
+                return result
+        length += 1
+
+def go(strings, instructions, sorter, new_indexes):
+    for idx, inst_list in enumerate(instructions):
+        current = strings[idx]
+        for inst in inst_list:
+            targets = inst.numbers
+            for i, number in enumerate(targets):
+                targets[i] = strings[new_indexes[number]]
+            # Forbidden constraint
+            if inst.instr_type:
+                if inst.any:
+                    sorter.add_forbidden_constraint_any_y(current, targets, inst.intervals)
+                else:
+                    for target in targets:
+                        sorter.add_forbidden_constraint(current, target, inst.intervals)
+            else:
+                # Maximizing distance constraint
+                for target in targets:
+                    sorter.add_maximize_distance_constraint(current, target)
+
 def order_table(res, table, roles, dep_pattern):
     new_pos = [0] * len(table)
     for i, old_index in enumerate(res):
         new_pos[old_index] = i
     updated_roles = [False] * len(roles)
-    for row in table[1:]:
-        new_row = []
+    new_table = [table[0]]
+    for n in res[1:]:
+        row = table[n]
         for j, cell in enumerate(row):
             if roles[j] == 'dependencies':
                 if cell:
@@ -354,7 +364,7 @@ def order_table(res, table, roles, dep_pattern):
                             prev_str_len = 0
                             id = 0
                             id2 = 0
-                            while id < len(new_pos) and str_len < len(prefix):
+                            while id < len(new_pos) and str_len <= len(prefix):
                                 prev_str_len = str_len
                                 if id == id2:
                                     str_len += len(dep_pattern[j][id])
@@ -369,7 +379,8 @@ def order_table(res, table, roles, dep_pattern):
                                 dep_pattern[j][id-1] = new_instr[prev_str_len:str_len]
                                 updated_roles[j] = True
                     row[j] = ';'.join(updated_cell)
-    return table
+        new_table.append(row)
+    return new_table
 
 def sorter(table, roles, errors, warnings):
     alph = generate_unique_strings(max(len(roles), len(table)))
@@ -384,6 +395,16 @@ def sorter(table, roles, errors, warnings):
                     warnings.append(f"Warning in row {i+1}, column {alph[path_index]}: {cell!r} is not a valid URL or local path")
     pointed_by = [[] for _ in range(len(table))]
     point_to = [[] for _ in range(len(table))]
+    names = [[] for _ in range(len(table))]
+    for i, row in enumerate(table[1:], start=1):
+        for j, cell in enumerate(row):
+            if roles[j] == 'names' and cell:
+                cell_list = cell.split(';')
+                for name in cell_list:
+                    if name not in names[i]:
+                        names[i].append(name)
+                    else:
+                        warnings.append(f"Redundant name {name!r} in row {i}, column {alph[j]}")
     for i, row in enumerate(table[1:], start=1):
         for j, cell in enumerate(row):
             if roles[j] == 'pointers':
@@ -399,8 +420,14 @@ def sorter(table, roles, errors, warnings):
                                 pointed_by[k].append(i)
                                 point_to[i].append(k)
                         except ValueError:
-                            errors.append(f"Error in row {i}, column {alph[j]}: {instr!r} is not a valid pointer")
-                            return table
+                            for ii, rrow in enumerate(names[1:], start=1):
+                                if instr in rrow:
+                                    pointed_by[ii].append(i)
+                                    point_to[i].append(ii)
+                                    break
+                            else:
+                                errors.append(f"Error in row {i+1}, column {alph[j]}: row {instr!r} does not exist")
+                                return table
     # find a cycle
     def dfs(node, visited, stack):
         visited.add(node)
@@ -422,10 +449,9 @@ def sorter(table, roles, errors, warnings):
                 return table
     attributes = {}
     attributes_table = [[] for _ in range(len(table))]
-    names = [[] for _ in range(len(table))]
     for i, row in enumerate(table[1:], start=1):
         for j, cell in enumerate(row):
-            if roles[j] == 'attributes':
+            if roles[j] == 'sprawl':
                 if not cell:
                     continue
                 cell_list = cell.split(';')
@@ -440,17 +466,10 @@ def sorter(table, roles, errors, warnings):
                         attributes_table[i].append(cat)
                     else:
                         warnings.append(f"Redundant attribute {cat!r} in row {i}, column {alph[j]}")
-            elif roles[j] == 'names':
-                cell_list = cell.split(';')
-                for name in cell_list:
-                    if name not in names[i]:
-                        names[i].append(name)
-                    else:
-                        warnings.append(f"Redundant name {name!r} in row {i}, column {alph[j]}")
     for cat in attributes:
-        for row in names:
+        for i, row in enumerate(names[1:], start=1):
             if cat in row:
-                errors.append(f"Error: attribute {cat!r} in row {attributes[cat][0]} conflicts with name in row {row[0]}")
+                errors.append(f"Error: attribute {cat!r} in row {attributes[cat][0]} conflicts with name in row {i}")
                 return table
     pointed_givers = [dict() for _ in range(len(table))]
     pointed_givers_path = [0 for _ in range(len(table))]
@@ -481,7 +500,7 @@ def sorter(table, roles, errors, warnings):
     to_old_indexes = []
     staying = [False]
     cat_rows = []
-    new_index = 1
+    new_index = 0
     for i, row in enumerate(table[1:], start=1):
         staying.append(False)
         if path_index != -1 and row[path_index]:
@@ -492,8 +511,13 @@ def sorter(table, roles, errors, warnings):
             to_old_indexes.append(i)
         else:
             cat_rows.append(i)
-    for cat in attributes:
+    for cat in list(attributes.keys()):
         attributes[cat] = list(filter(lambda x: staying[x], attributes[cat]))
+        if not attributes[cat]:
+            del attributes[cat]
+        elif len(attributes[cat]) == 1:
+            warnings.append(f"Warning: attribute {cat!r} only in row {attributes[cat][0]}, consider removing it")
+            del attributes[cat]
     for row in pointed_by_all:
         row[:] = list(filter(lambda x: staying[x], row))
     instr_table = [[] for _ in range(len(table))]
@@ -555,9 +579,11 @@ def sorter(table, roles, errors, warnings):
             instr_table[p] = list(set(instr_table[p] + instr_table[i]))
     instr_table_int = []
     for i in valid_row_indexes:
-        instr_table_int.append(instr_table[i-1])
+        instr_table_int.append(instr_table[i])
     sorter = ConstraintSorter(alph[:len(valid_row_indexes)])
-    go(alph, instr_table_int, sorter)
+    go(alph, instr_table_int, sorter, new_indexes)
+    for cat in attributes:
+        sorter.add_group_maximize(set(attributes[cat]))
     
     # Solve the problem
     print("Solving constraint-based sorting problem...")
@@ -591,6 +617,7 @@ def sorter(table, roles, errors, warnings):
             else:
                 d += 1
         i += 1
+    res.extend(cat_rows)
     new_table = order_table(res, table, roles, dep_pattern)
     return new_table
 
