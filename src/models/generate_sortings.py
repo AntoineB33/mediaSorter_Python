@@ -573,10 +573,33 @@ def sorter(table, roles, errors, warnings):
                         else:
                             errors.append(f"Error in row {i+1}, column {alph[j]}: {instr!r} does not match expected format")
                             return table
+                        numbers = list(map(lambda x: new_indexes[x], numbers))
                         instr_table[i].append(instr_struct(instr_type, match.group("any"), numbers, intervals))
     for i in valid_row_indexes:
-        for p in pointed_by_all[i]:
-            instr_table[p] = list(set(instr_table[p] + instr_table[i]))
+        for j in enumerate(point_to_all[i]):
+            instr_table[i] = list(set(instr_table[i] + instr_table[j]))
+    # detect cycles in instr_table
+    def has_cycle(instr_table, visited, stack, node, after=True):
+        visited.add(node)
+        stack.add(node)
+        for neighbor in instr_table[node]:
+            if neighbor.any and not neighbor.instr_type and neighbor.intervals[0] != (-float("inf"), -1) if after else neighbor.intervals[-1] != (1, float("inf")):
+                continue
+            for target in neighbor.numbers:
+                if target not in visited:
+                    if has_cycle(instr_table, visited, stack, target, after):
+                        return True
+                elif target in stack and len(stack) > 1:
+                    return True
+        stack.remove(node)
+        return False
+    visited = set()
+    stack = set()
+    for p in [0, 1]:
+        for i in valid_row_indexes:
+            if has_cycle(instr_table, visited, stack, i, p):
+                errors.append(f"Cycle detected: {(' after ' if p else ' before ').join([str(i)]+[str(k) for k in stack])}")
+                return table
     instr_table_int = []
     for i in valid_row_indexes:
         instr_table_int.append(instr_table[i])
@@ -628,6 +651,12 @@ if __name__ == "__main__":
     clipboard_content = pyperclip.paste()
     table = [line.split('\t') for line in clipboard_content.split('\n')]
     for row in table:
+        for j, cell in enumerate(row):
+            cells = cell.split(';')
+            for k, c in enumerate(cells):
+                cells[k] = c.strip().lower()
+            row[j] = ';'.join(cells)
+    for row in table:
         row[-1] = row[-1].strip()
     roles = table[0]
     warnings = []
@@ -644,4 +673,4 @@ if __name__ == "__main__":
             print(f"- {warning}")
     new_clipboard_content = '\n'.join(['\t'.join(row) for row in result])
     pyperclip.copy(new_clipboard_content)
-    input("Sorted table copied to clipboard. Press Enter to exit.")
+    # input("Sorted table copied to clipboard. Press Enter to exit.")
