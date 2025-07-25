@@ -1,6 +1,6 @@
 import re
 import random
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Optional
 import itertools
 import string
 from typing import List, Tuple
@@ -79,7 +79,6 @@ class ConstraintSorter:
         # For each pair (a, b) add both directions to maximize distance
         for u, v in itertools.combinations(names, 2):
             self.add_maximize_distance_constraint(u, v)
-
 
     def is_valid_placement(self, arrangement: List[str]) -> bool:
         """Check if an arrangement satisfies all constraints."""
@@ -227,29 +226,97 @@ class ConstraintSorter:
 
         return current
 
-    def solve(self, max_attempts: int = 10, max_iterations: int = 1000) -> List[str]:
-        """
-        Solve the constraint satisfaction problem.
-        Returns the best arrangement found.
-        """
+    def get_violations(self, arrangement: List[str]) -> List[str]:
+        """Return detailed violation messages for an arrangement."""
+        violations = []
+        pos = {elem: idx for idx, elem in enumerate(arrangement) if elem is not None}
+
+        # Check standard forbidden constraints
+        for x, y, intervals in self.forbidden_constraints:
+            if x not in pos or y not in pos:
+                continue  # Skip if elements aren't placed
+            x_pos, y_pos = pos[x], pos[y]
+            relative_pos = x_pos - y_pos
+            for start, end in intervals:
+                low = -self.n if start == -float('inf') else start
+                high = self.n if end == float('inf') else end
+                if low <= relative_pos <= high:
+                    violations.append(
+                        f"Forbidden: {x} (pos {x_pos}) is {relative_pos} positions from {y} (pos {y_pos}), "
+                        f"which falls in forbidden interval [{start}, {end}]"
+                    )
+                    break
+
+        # Check disjunctive constraints
+        for x, y_list, intervals in self.required_disjunctive_constraints:
+            if x not in pos:
+                continue  # Skip if x isn't placed
+            placed_ys = [y for y in y_list if y in pos]
+            if not placed_ys:
+                violations.append(
+                    f"Disjunctive: {x} is placed (pos {pos[x]}), "
+                    f"but none of {y_list} are present to satisfy the constraint"
+                )
+                continue
+
+            satisfied = False
+            for y in placed_ys:
+                relative_pos = pos[x] - pos[y]
+                in_forbidden = False
+                for start, end in intervals:
+                    low = -self.n if start == -float('inf') else start
+                    high = self.n if end == float('inf') else end
+                    if low <= relative_pos <= high:
+                        in_forbidden = True
+                        break
+                if not in_forbidden:
+                    satisfied = True
+                    break
+
+            if not satisfied:
+                details = [
+                    f"relative to {y} (pos {pos[y]}): Δpos = {pos[x] - pos[y]} "
+                    f"(forbidden in {intervals})"
+                    for y in placed_ys
+                ]
+                violations.append(
+                    f"Disjunctive: {x} (pos {pos[x]}) violates required position "
+                    f"relative to all {y_list}:\n  " + "\n  ".join(details)
+                )
+
+        return violations
+
+    def solve(self, max_attempts: int = 10, max_iterations: int = 1000) -> Optional[List[str]]:
+        """Solve constraints. Returns valid arrangement or None if none found.
+        Detailed violations stored in .last_violations if failed."""
+        self.last_violations = None
+        self.last_failed_arrangement = None
         best_arrangement = None
         best_score = -1
 
         for attempt in range(max_attempts):
             initial = self.generate_random_valid_arrangement()
-            if initial is None or not self.is_valid_placement(initial):
-                continue
-
-            optimized = self.local_search_optimization(initial, max_iterations)
-
-            score = self.calculate_distance_score(optimized)
-            if score > best_score:
-                # Final check to ensure the best one is always valid
-                if self.is_valid_placement(optimized):
+            if self.is_valid_placement(initial):
+                optimized = self.local_search_optimization(initial, max_iterations)
+                score = self.calculate_distance_score(optimized)
+                if score > best_score and self.is_valid_placement(optimized):
                     best_arrangement = optimized
                     best_score = score
+            else:
+                self.last_failed_arrangement = initial
 
-        return best_arrangement
+        if best_arrangement is not None:
+            return best_arrangement
+
+        # If no valid solution, analyze last failed arrangement
+        if self.last_failed_arrangement is not None:
+            self.last_violations = self.get_violations(self.last_failed_arrangement)
+        else:
+            # Fallback: Validate a new greedy arrangement
+            greedy_arr = self.greedy_placement()
+            self.last_failed_arrangement = greedy_arr
+            self.last_violations = self.get_violations(greedy_arr)
+        return None
 
 def get_intervals(interval_str):
     # First, parse the positions of intervals
@@ -318,20 +385,21 @@ def generate_unique_strings(n):
                 return result
         length += 1
 
-def go(strings, instructions, sorter, new_indexes):
+def go(strings, instructions, sorter):
     for idx, inst_list in enumerate(instructions):
         current = strings[idx]
         for inst in inst_list:
-            targets = inst.numbers
-            for i, number in enumerate(targets):
-                targets[i] = strings[new_indexes[number]]
+            targets = []
+            for number in inst.numbers:
+                targets.append(strings[number])
             # Forbidden constraint
             if inst.instr_type:
                 if inst.any:
                     sorter.add_forbidden_constraint_any_y(current, targets, inst.intervals)
                 else:
                     for target in targets:
-                        sorter.add_forbidden_constraint(current, target, inst.intervals)
+                        if target != current:
+                            sorter.add_forbidden_constraint(current, target, inst.intervals)
             else:
                 # Maximizing distance constraint
                 for target in targets:
@@ -576,7 +644,7 @@ def sorter(table, roles, errors, warnings):
                         numbers = list(map(lambda x: new_indexes[x], numbers))
                         instr_table[i].append(instr_struct(instr_type, match.group("any"), numbers, intervals))
     for i in valid_row_indexes:
-        for j in enumerate(point_to_all[i]):
+        for j in point_to_all[i]:
             instr_table[i] = list(set(instr_table[i] + instr_table[j]))
     # detect cycles in instr_table
     def has_cycle(instr_table, visited, stack, node, after=True):
@@ -598,15 +666,15 @@ def sorter(table, roles, errors, warnings):
     for p in [0, 1]:
         for i in valid_row_indexes:
             if has_cycle(instr_table, visited, stack, i, p):
-                errors.append(f"Cycle detected: {(' after ' if p else ' before ').join([str(i)]+[str(k) for k in stack])}")
+                errors.append(f"Cycle detected: {(' after ' if p else ' before ').join([str(to_old_indexes[i])]+[str(to_old_indexes[k]) for k in stack])}")
                 return table
     instr_table_int = []
     for i in valid_row_indexes:
         instr_table_int.append(instr_table[i])
     sorter = ConstraintSorter(alph[:len(valid_row_indexes)])
-    go(alph, instr_table_int, sorter, new_indexes)
+    go(alph, instr_table_int, sorter)
     for cat in attributes:
-        sorter.add_group_maximize(set(attributes[cat]))
+        sorter.add_group_maximize(set(map(lambda x: new_indexes[x], attributes[cat])))
     
     # Solve the problem
     print("Solving constraint-based sorting problem...")
