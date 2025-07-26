@@ -1,9 +1,8 @@
 import re
 import random
-from typing import List, Tuple, Set, Optional
+from typing import List, Tuple, Set, Optional, Dict
 import itertools
 import string
-from typing import List, Tuple
 
 PATTERN_DISTANCE = r'^(?P<prefix>as far as possible from )(?P<any>any)?((?P<number>\d+)|(?P<name>.+))(?P<suffix>)$'
 PATTERN_AREAS = r'^(?P<prefix>.*\|)(?P<any>any)?((?P<number>\d+)|(?P<name>.+))(?P<suffix>\|.*)$'
@@ -35,11 +34,10 @@ class ConstraintSorter:
     def __init__(self, elements: List[str]):
         self.elements = elements
         self.n = len(elements)
-        self.forbidden_constraints = []      # (x, y, intervals) where x cannot be in intervals around y
-        # New constraint type: (x, y_list, intervals)
-        # x's position relative to *at least one* y in y_list must NOT be in the forbidden intervals.
-        self.required_disjunctive_constraints = []
-        self.maximize_distance = []          # (x, y) where distance between x and y should be maximized
+        self.forbidden_constraints: List[Tuple[str, str, List[Tuple[float, float]]]] = []
+        self.required_disjunctive_constraints: List[Tuple[str, List[str], List[Tuple[float, float]]]] = []
+        self.maximize_distance: List[Tuple[str, str]] = []
+        self.last_violations: Optional[List[str]] = None
 
     def add_forbidden_constraint(self, x: str, y: str, intervals: List[Tuple[int, int]]):
         """
@@ -47,95 +45,56 @@ class ConstraintSorter:
         Intervals are relative positions: [-10,-6] means x cannot be 10 to 6 positions before y.
         Use float('inf') for 'end of list' in intervals.
         """
-        self.forbidden_constraints.append((x, y, intervals))
+        self.forbidden_constraints.append((x, y, [(float(s), float(e)) for s, e in intervals]))
 
     def add_forbidden_constraint_any_y(self, x: str, y_list: List[str], intervals: List[Tuple[int, int]]):
         """
         Adds a constraint that x's relative position to AT LEAST ONE element in y_list
         must fall OUTSIDE the specified forbidden intervals.
-
-        For example:
-        add_forbidden_constraint_any_y('E', ['F', 'G', 'H'], [(-float('inf'), 0), (2, float('inf'))])
-        This defines the forbidden relative positions as (<= 0) or (>= 2).
-        Therefore, the only allowed relative position is 1.
-        The constraint means that (pos(E) - pos(y)) must be 1 for at least one y in ['F', 'G', 'H'].
-        In other words, E must immediately follow F, or G, or H.
         """
-        self.required_disjunctive_constraints.append((x, y_list, intervals))
+        self.required_disjunctive_constraints.append((x, y_list, [(float(s), float(e)) for s, e in intervals]))
 
     def add_maximize_distance_constraint(self, x: str, y: str):
-        """
-        Add a constraint that elements x and y should be as far apart as possible.
-        """
         self.maximize_distance.append((x, y))
-    
+
     def add_group_maximize(self, index_set: Set[int]):
-        """
-        For every unordered pair of indices in index_set, add a
-        maximize_distance constraint between the corresponding elements.
-        """
-        # Map indices to element names
         names = [self.elements[i] for i in index_set]
-        # For each pair (a, b) add both directions to maximize distance
         for u, v in itertools.combinations(names, 2):
             self.add_maximize_distance_constraint(u, v)
 
-    def is_valid_placement(self, arrangement: List[str]) -> bool:
-        """Check if an arrangement satisfies all constraints."""
-        pos = {elem: i for i, elem in enumerate(arrangement) if elem is not None}
+    def is_valid_placement(self, arrangement: List[Optional[str]]) -> bool:
+        """Check if a partial or full arrangement satisfies all hard constraints."""
+        pos: Dict[str, int] = {elem: i for i, elem in enumerate(arrangement) if elem is not None}
 
         # 1. Check standard forbidden constraints
         for x, y, intervals in self.forbidden_constraints:
             if x not in pos or y not in pos:
                 continue
-
-            x_pos, y_pos = pos[x], pos[y]
-            relative_pos = x_pos - y_pos
-
+            relative_pos = pos[x] - pos[y]
             for start, end in intervals:
-                _start, _end = start, end
-                if _end == float('inf'):
-                    _end = self.n  # A safe upper bound
-                if _start == -float('inf'):
-                    _start = -self.n # A safe lower bound
+                if start <= relative_pos <= end:
+                    return False
 
-                if _start <= relative_pos <= _end:
-                    return False  # Violation
-
-        # 2. Check the "required disjunctive" constraints
+        # 2. Check required disjunctive constraints
         for x, y_list, intervals in self.required_disjunctive_constraints:
             if x not in pos:
                 continue
 
+            # This constraint is only active if at least one 'y' is also placed.
+            placed_ys = [y_elem for y_elem in y_list if y_elem in pos]
+            if not placed_ys:
+                continue
+
             is_satisfied_for_x = False
-            # Check if any y in the list satisfies the condition for x
-            for y in y_list:
-                if y not in pos:
-                    continue
-
-                x_pos, y_pos = pos[x], pos[y]
-                relative_pos = x_pos - y_pos
-
-                is_in_forbidden_zone = False
-                for start, end in intervals:
-                    _start, _end = start, end
-                    if _end == float('inf'):
-                        _end = self.n
-                    if _start == -float('inf'):
-                        _start = -self.n
-
-                    if _start <= relative_pos <= _end:
-                        is_in_forbidden_zone = True
-                        break  # It's in a forbidden interval, this y is not valid
-
+            for y in placed_ys:
+                relative_pos = pos[x] - pos[y]
+                is_in_forbidden_zone = any(start <= relative_pos <= end for start, end in intervals)
+                
                 if not is_in_forbidden_zone:
-                    # Found a 'y' for which 'x' is in an allowed position.
                     is_satisfied_for_x = True
-                    break  # This disjunctive constraint is satisfied, move to the next one
-
-            # If x is placed and we couldn't find any y in y_list that satisfies
-            # the constraint, the arrangement is invalid.
-            if not is_satisfied_for_x and any(y in pos for y in y_list):
+                    break
+            
+            if not is_satisfied_for_x:
                 return False
 
         return True
@@ -144,71 +103,12 @@ class ConstraintSorter:
         """Calculate score based on distance maximization constraints (higher is better)."""
         pos = {elem: i for i, elem in enumerate(arrangement)}
         total_distance = 0
-
         for x, y in self.maximize_distance:
             if x in pos and y in pos:
-                distance = abs(pos[x] - pos[y])
-                total_distance += distance
-
+                total_distance += abs(pos[x] - pos[y])
         return total_distance
 
-    def generate_random_valid_arrangement(self, max_attempts: int = 1000) -> List[str]:
-        """Generate a random valid arrangement that satisfies all forbidden constraints."""
-        for _ in range(max_attempts):
-            arrangement = self.elements.copy()
-            random.shuffle(arrangement)
-
-            if self.is_valid_placement(arrangement):
-                return arrangement
-
-        # If we can't find a valid random arrangement, try a more systematic approach
-        return self.greedy_placement()
-
-    def greedy_placement(self) -> List[str]:
-        """Try to place elements greedily to satisfy constraints."""
-        arrangement = [None] * self.n
-        remaining = set(self.elements)
-
-        constrained_elements = set()
-        for x, y, _ in self.forbidden_constraints:
-            constrained_elements.add(x)
-            constrained_elements.add(y)
-        for x, y_list, _ in self.required_disjunctive_constraints:
-            constrained_elements.add(x)
-            constrained_elements.update(y_list)
-
-        unconstrained = [elem for elem in self.elements if elem not in constrained_elements]
-        positions = list(range(self.n))
-        random.shuffle(positions)
-
-        for i, elem in enumerate(unconstrained):
-            if i < len(positions):
-                arrangement[positions[i]] = elem
-                remaining.remove(elem)
-
-        for elem in list(remaining):
-            placed = False
-            shuffled_positions = list(range(self.n))
-            random.shuffle(shuffled_positions)
-            for pos in shuffled_positions:
-                if arrangement[pos] is None:
-                    arrangement[pos] = elem
-                    # Check if the partial arrangement is valid
-                    if self.is_valid_placement(arrangement):
-                        placed = True
-                        break
-                    arrangement[pos] = None # Backtrack
-
-            if not placed:
-                 # Force placement if no valid spot is found (may result in invalid solution)
-                 # A more robust implementation might raise an error or return None here.
-                for pos in range(self.n):
-                    if arrangement[pos] is None:
-                        arrangement[pos] = elem
-                        break
-        return arrangement
-
-    def local_search_optimization(self, initial_arrangement: List[str], max_iterations: int = 1000) -> List[str]:
+    def local_search_optimization(self, initial_arrangement: List[str], max_iterations: int = 2000) -> List[str]:
         """Improve arrangement using local search while maintaining constraint satisfaction."""
         current = initial_arrangement.copy()
         current_score = self.calculate_distance_score(current)
@@ -223,99 +123,81 @@ class ConstraintSorter:
                 if new_score > current_score:
                     current = new_arrangement
                     current_score = new_score
-
         return current
 
-    def get_violations(self, arrangement: List[str]) -> List[str]:
-        """Return detailed violation messages for an arrangement."""
-        violations = []
-        pos = {elem: idx for idx, elem in enumerate(arrangement) if elem is not None}
+    # Replace your old solve() method with this new one
+    def solve(self, max_iterations: int = 2000) -> Optional[List[str]]:
+        """
+        Finds a valid arrangement using backtracking, then optimizes it for distance.
+        Returns the best arrangement found, or None if no valid arrangement exists.
+        """
+        self.last_violations = []
+        
+        # Find a single valid arrangement using a systematic backtracking search
+        valid_arrangement = self._solve_backtracking()
 
-        # Check standard forbidden constraints
-        for x, y, intervals in self.forbidden_constraints:
-            if x not in pos or y not in pos:
-                continue  # Skip if elements aren't placed
-            x_pos, y_pos = pos[x], pos[y]
-            relative_pos = x_pos - y_pos
-            for start, end in intervals:
-                low = -self.n if start == -float('inf') else start
-                high = self.n if end == float('inf') else end
-                if low <= relative_pos <= high:
-                    violations.append(
-                        f"Forbidden: {x} (pos {x_pos}) is {relative_pos} positions from {y} (pos {y_pos}), "
-                        f"which falls in forbidden interval [{start}, {end}]"
-                    )
-                    break
+        if valid_arrangement is None:
+            self.last_violations = ["No valid arrangement could be found by the backtracking solver."]
+            return None
 
-        # Check disjunctive constraints
-        for x, y_list, intervals in self.required_disjunctive_constraints:
-            if x not in pos:
-                continue  # Skip if x isn't placed
-            placed_ys = [y for y in y_list if y in pos]
-            if not placed_ys:
-                violations.append(
-                    f"Disjunctive: {x} is placed (pos {pos[x]}), "
-                    f"but none of {y_list} are present to satisfy the constraint"
-                )
-                continue
+        # If a valid solution is found, optimize it for the distance score
+        if self.maximize_distance:
+            optimized_arrangement = self.local_search_optimization(valid_arrangement, max_iterations)
+            return optimized_arrangement
+        
+        return valid_arrangement
 
-            satisfied = False
-            for y in placed_ys:
-                relative_pos = pos[x] - pos[y]
-                in_forbidden = False
-                for start, end in intervals:
-                    low = -self.n if start == -float('inf') else start
-                    high = self.n if end == float('inf') else end
-                    if low <= relative_pos <= high:
-                        in_forbidden = True
-                        break
-                if not in_forbidden:
-                    satisfied = True
-                    break
+    # Add this new private helper method for the backtracking logic
+    def _solve_backtracking(self) -> Optional[List[str]]:
+        """
+        A systematic backtracking search to find one valid arrangement.
+        """
+        arrangement: List[Optional[str]] = [None] * self.n
+        remaining_elements = set(self.elements)
 
-            if not satisfied:
-                details = [
-                    f"relative to {y} (pos {pos[y]}): Δpos = {pos[x] - pos[y]} "
-                    f"(forbidden in {intervals})"
-                    for y in placed_ys
-                ]
-                violations.append(
-                    f"Disjunctive: {x} (pos {pos[x]}) violates required position "
-                    f"relative to all {y_list}:\n  " + "\n  ".join(details)
-                )
+        # A simple heuristic: try to place more constrained elements first.
+        constrained_elements_count = {elem: 0 for elem in self.elements}
+        all_constraints = (self.forbidden_constraints + self.required_disjunctive_constraints)
+        for constraint in all_constraints:
+            constrained_elements_count[constraint[0]] += 1
+            for y in constraint[1]:
+                 constrained_elements_count[y] += 1
+        
+        # Sort elements to place by how constrained they are, descending.
+        elements_to_place = sorted(
+            list(self.elements), 
+            key=lambda e: constrained_elements_count[e], 
+            reverse=True
+        )
 
-        return violations
+        return self._backtrack_recursive(arrangement, elements_to_place)
 
-    def solve(self, max_attempts: int = 10, max_iterations: int = 1000) -> Optional[List[str]]:
-        """Solve constraints. Returns valid arrangement or None if none found.
-        Detailed violations stored in .last_violations if failed."""
-        self.last_violations = None
-        self.last_failed_arrangement = None
-        best_arrangement = None
-        best_score = -1
+    def _backtrack_recursive(self, arrangement: List[Optional[str]], elements_to_place: List[str]) -> Optional[List[str]]:
+        """The recursive core of the backtracking solver."""
+        # Base case: If there are no more elements to place, we found a solution.
+        if not elements_to_place:
+            return [elem for elem in arrangement if elem is not None]
 
-        for attempt in range(max_attempts):
-            initial = self.generate_random_valid_arrangement()
-            if self.is_valid_placement(initial):
-                optimized = self.local_search_optimization(initial, max_iterations)
-                score = self.calculate_distance_score(optimized)
-                if score > best_score and self.is_valid_placement(optimized):
-                    best_arrangement = optimized
-                    best_score = score
-            else:
-                self.last_failed_arrangement = initial
+        element_to_try = elements_to_place[0]
+        remaining = elements_to_place[1:]
 
-        if best_arrangement is not None:
-            return best_arrangement
+        # Iterate through all available empty slots for the current element
+        for i in range(self.n):
+            if arrangement[i] is None:
+                # Try placing the element in the current slot
+                arrangement[i] = element_to_try
 
-        # If no valid solution, analyze last failed arrangement
-        if self.last_failed_arrangement is not None:
-            self.last_violations = self.get_violations(self.last_failed_arrangement)
-        else:
-            # Fallback: Validate a new greedy arrangement
-            greedy_arr = self.greedy_placement()
-            self.last_failed_arrangement = greedy_arr
-            self.last_violations = self.get_violations(greedy_arr)
+                # Check if this partial arrangement is still valid
+                if self.is_valid_placement(arrangement):
+                    # If it's valid, recurse to place the next element
+                    result = self._backtrack_recursive(arrangement, remaining)
+                    if result:
+                        return result  # Solution found, propagate it up
+
+                # Backtrack: Undo the placement if it didn't lead to a solution
+                arrangement[i] = None
+        
+        # If we tried all positions for this element and none worked, this path is a dead end.
         return None
 
 def get_intervals(interval_str):
@@ -678,7 +560,7 @@ def sorter(table, roles, errors, warnings):
     
     # Solve the problem
     print("Solving constraint-based sorting problem...")
-    solution = sorter.solve(max_attempts=50, max_iterations=2000)
+    solution = sorter.solve(max_iterations=2000)
     
     if not solution:
         errors.append("No valid solution found!")
