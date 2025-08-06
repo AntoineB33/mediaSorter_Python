@@ -28,10 +28,10 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "test tests/unit/models/sorts.py",
+            "name": "test tests/unit/models/tests.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/tests/unit/models/test.py",
+            "program": "${workspaceFolder}/tests/unit/models/test_generate_sortings.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env"
         }
