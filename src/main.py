@@ -36,7 +36,7 @@ async def main():
     if not engine.rootObjects():
         sys.exit(-1)
         
-    model.start_background_tasks()
+    # model.start_background_tasks()
 
     with loop:
         sys.exit(loop.run_forever())
